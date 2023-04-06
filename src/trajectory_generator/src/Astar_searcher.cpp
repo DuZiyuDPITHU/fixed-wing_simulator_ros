@@ -329,6 +329,16 @@ vector<Vector3d> AstarPathFinder::getPath() {
    * STEP 1.4:  trace back the found path
    *
    * **/
+  // Du: Implement A* traceback
+  GridNodePtr goalPtr = this->GridNodeMap[this->goalIdx(0)][this->goalIdx(1)][this->goalIdx(2)];
+  GridNodePtr temp = goalPtr;
+  path.push_back(temp->coord);
+  while (temp->cameFrom != NULL)
+  {
+    temp = temp->cameFrom;
+    path.push_back(temp->coord);
+  }
+  // Du: Implement A* traceback
 
   return path;
 }
@@ -341,6 +351,60 @@ vector<Vector3d> AstarPathFinder::pathSimplify(const vector<Vector3d> &path,
    * STEP 2.1:  implement the RDP algorithm
    *
    * **/
+  // Du: Implement RDP algorithm
+  // MOOC: Motion Planning for Mobile Robotics, by Fei Gao
+  double dmax = 0;
+  int index = 0;
+  int end = path.size();
+  Vector3d st = path.front();
+  Vector3d ed = path.back();
+  for (int i=1;i<(end - 1);i++)
+  {
+    // Heron's formula
+    Vector3d point = path[i];
+    double a = sqrt(pow(st(0)-ed(0),2)+pow(st(1)-ed(1),2)+pow(st(2)-ed(2),2));
+    double b = sqrt(pow(st(0)-point(0),2)+pow(st(1)-point(1),2)+pow(st(2)-point(2),2));
+    double c = sqrt(pow(point(0)-ed(0),2)+pow(point(1)-ed(1),2)+pow(point(2)-ed(2),2));
+    double p = (a+b+c)/2;
+    double S = sqrt(p*(p-a)*(p-b)*(p-c));
+    double d = 2*S/a;
+    if (d > dmax)
+    {
+      dmax = d;
+      index = i;
+    }
+  }
+  vector<Vector3d> resultlist1;
+  vector<Vector3d> resultlist2;
+  if (dmax > path_resolution)
+  {
+    vector<Vector3d> path1, path2;
+    for (int u=0;u <= index;u++)
+    {
+      path1.push_back(path[u]);
+    }
+    for (int k=0;k < end;k++)
+    {
+      path2.push_back(path[k]);
+    }
+    resultlist1 = pathSimplify(path1, path_resolution);
+    resultlist2 = pathSimplify(path2, path_resolution);
+    int a = resultlist1.size();
+    int b = resultlist2.size();
+    for (int j=0;j<a;j++)
+    {
+      subPath.push_back(resultlist1[j]);
+    }
+    for (int r=0;r<b;r++)
+    {
+      subPath.push_back(resultlist2[r]);
+    }
+  } else
+  {
+    subPath.push_back(path.front());
+    subPath.push_back(path.back());
+  }
+  // Du: Implement RDP algorithm
   return subPath;
 }
 
@@ -371,6 +435,9 @@ int AstarPathFinder::safeCheck(MatrixXd polyCoeff, VectorXd time) {
    * STEP 3.3:  finish the sareCheck()
    *
    * **/
-
+  // Du: safety check of polynomial traj
+  // MOOC: Motion Planning for Mobile Robots, by Fei Gao
+  
+  // Du: safety check of polynomial traj
   return unsafe_segment;
 }

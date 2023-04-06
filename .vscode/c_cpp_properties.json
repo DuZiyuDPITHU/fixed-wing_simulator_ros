@@ -1,0 +1,26 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/opt/ros/noetic/include/**",
+        "/home/du/fixed_wing_ros_ver/devel/include/**",
+        "/home/du/fixed_wing_ros_ver/src/src/read_only/Utils/pose_utils/include/**",
+        "/home/du/fixed_wing_ros_ver/src/src/read_only/Utils/quadrotor_msgs/include/**",
+        "/home/du/fixed_wing_ros_ver/src/src/read_only/quadrotor_simulator/so3_control/include/**",
+        "/home/du/fixed_wing_ros_ver/src/src/read_only/quadrotor_simulator/so3_quadrotor_simulator/include/**",
+        "/home/du/fixed_wing_ros_ver/src/src/trajectory_generator/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}
