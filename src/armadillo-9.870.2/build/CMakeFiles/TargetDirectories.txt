@@ -1,0 +1,7 @@
+/home/duziyu/Project/src/src/armadillo-9.870.2/build/CMakeFiles/install/strip.dir
+/home/duziyu/Project/src/src/armadillo-9.870.2/build/CMakeFiles/install/local.dir
+/home/duziyu/Project/src/src/armadillo-9.870.2/build/CMakeFiles/install.dir
+/home/duziyu/Project/src/src/armadillo-9.870.2/build/CMakeFiles/list_install_components.dir
+/home/duziyu/Project/src/src/armadillo-9.870.2/build/CMakeFiles/rebuild_cache.dir
+/home/duziyu/Project/src/src/armadillo-9.870.2/build/CMakeFiles/edit_cache.dir
+/home/duziyu/Project/src/src/armadillo-9.870.2/build/CMakeFiles/armadillo.dir
