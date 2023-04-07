@@ -212,13 +212,15 @@ double AstarPathFinder::getHeu(GridNodePtr node1, GridNodePtr node2, GridNodePtr
                             pow(abs(start_to_goal_idx(0)*d_node_idx(2)-start_to_goal_idx(2)*d_node_idx(0)), 2) +
                             pow(abs(start_to_goal_idx(1)*d_node_idx(0)-start_to_goal_idx(0)*d_node_idx(1)), 2));
   h += 0.001*tie_breaker;
+  printf("Heuristic from: [%d, %d, %d] to [%d, %d, %d]: %d tie: %d\n", node1->index(0), node1->index(1), node1->index(2), 
+                          node2->index(0), node2->index(1), node2->index(2), h, tie_breaker);
   // Du: Implement Heuristic Function for A*
   return h;
 }
 
 void AstarPathFinder::AstarGraphSearch(Vector3d start_pt, Vector3d end_pt) {
   ros::Time time_1 = ros::Time::now();
-
+  printf("Start Graph Search\n");
   // index of start_point and end_point
   Vector3i start_idx = coord2gridIndex(start_pt);
   Vector3i end_idx = coord2gridIndex(end_pt);
