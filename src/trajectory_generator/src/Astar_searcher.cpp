@@ -193,16 +193,19 @@ double AstarPathFinder::getHeu(GridNodePtr node1, GridNodePtr node2, GridNodePtr
   if (d_node_idx(2)<distance_sort[1])
   {
     distance_sort[0] = d_node_idx(2);
-  } else if(d_node_idx(2)>distance_sort[2])
+  }
+  else if(d_node_idx(2)>distance_sort[2])
   {
     distance_sort[0] = distance_sort[1];
     distance_sort[1] = distance_sort[2];
     distance_sort[2] = d_node_idx(2);
-  } else
+  }
+  else
   {
     distance_sort[0] = distance_sort[1];
     distance_sort[1] = d_node_idx(2);
   }
+  //printf("distance_sort: [%d,  %d, %d]\n", distance_sort[0], distance_sort[1], distance_sort[2]);
   h = distance_sort[0]*1.718 + (distance_sort[1]-distance_sort[0])*1.414 + (distance_sort[2] - distance_sort[1]);
   Vector3i start_to_goal_idx;
   start_to_goal_idx(0) = abs((node2->index)(0) - (start_node->index)(0));
@@ -211,9 +214,10 @@ double AstarPathFinder::getHeu(GridNodePtr node1, GridNodePtr node2, GridNodePtr
   double tie_breaker = sqrt(pow(abs(start_to_goal_idx(2)*d_node_idx(1)-start_to_goal_idx(1)*d_node_idx(2)), 2) + 
                             pow(abs(start_to_goal_idx(0)*d_node_idx(2)-start_to_goal_idx(2)*d_node_idx(0)), 2) +
                             pow(abs(start_to_goal_idx(1)*d_node_idx(0)-start_to_goal_idx(0)*d_node_idx(1)), 2));
+  tie_breaker = 0;
   h += 0.001*tie_breaker;
-  printf("Heuristic from: [%d, %d, %d] to [%d, %d, %d]: %d tie: %d\n", node1->index(0), node1->index(1), node1->index(2), 
-                          node2->index(0), node2->index(1), node2->index(2), h, tie_breaker);
+  //printf("Heuristic from: [%d, %d, %d] to [%d, %d, %d]: %f tie: %f\n", node1->index(0), node1->index(1), node1->index(2), 
+  //                        node2->index(0), node2->index(1), node2->index(2), h, tie_breaker);
   // Du: Implement Heuristic Function for A*
   return h;
 }
@@ -287,7 +291,8 @@ void AstarPathFinder::AstarGraphSearch(Vector3d start_pt, Vector3d end_pt) {
     // check if pt is goal point
     if (currentPtr->coord == endPtr->coord)
     {
-      break;
+      printf("Exit A* main loop\n");
+      return;
     }
     else
     {

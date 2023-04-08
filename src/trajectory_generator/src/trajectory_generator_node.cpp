@@ -234,7 +234,7 @@ bool trajGeneration() {
    * **/
   _astar_path_finder->AstarGraphSearch(start_pt, target_pt);
   auto grid_path = _astar_path_finder->getPath();
-
+  printf("Get A* path\n");
   // Reset map for next call
 
   /**
@@ -247,7 +247,7 @@ bool trajGeneration() {
   for (int k = 0; k < int(grid_path.size()); k++) {
     path.row(k) = grid_path[k];
   }
-
+  printf("Simplify A* traj.\n");
   /**
    *
    * STEP 3:  Trajectory optimization
@@ -333,7 +333,7 @@ void trajPublish(MatrixXd polyCoeff, VectorXd time) {
 
   traj_msg.header.seq = count;
   traj_msg.header.stamp = ros::Time::now();
-  traj_msg.header.frame_id = std::string("/world");
+  traj_msg.header.frame_id = std::string("world");
   traj_msg.trajectory_id = count;
   traj_msg.action = quadrotor_msgs::PolynomialTrajectory::ACTION_ADD;
 
@@ -379,7 +379,7 @@ void visTrajectory(MatrixXd polyCoeff, VectorXd time) {
   visualization_msgs::Marker _traj_vis;
 
   _traj_vis.header.stamp = ros::Time::now();
-  _traj_vis.header.frame_id = "/world";
+  _traj_vis.header.frame_id = "world";
 
   _traj_vis.ns = "traj_node/trajectory";
   _traj_vis.id = 0;
