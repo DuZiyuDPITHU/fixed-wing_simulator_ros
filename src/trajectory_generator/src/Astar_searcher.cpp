@@ -390,7 +390,7 @@ vector<Vector3d> AstarPathFinder::pathSimplify(const vector<Vector3d> &path,
     {
       path1.push_back(path[u]);
     }
-    for (int k=0;k < end;k++)
+    for (int k=index;k < end;k++)
     {
       path2.push_back(path[k]);
     }
