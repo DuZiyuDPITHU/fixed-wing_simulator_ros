@@ -32,6 +32,17 @@
       <param name="replanning/thresh_replan"    value="1.5" type="double"/>
       <param name="replanning/thresh_no_replan" value="2.0" type="double"/>
       <param name="path/resolution"             value="0.2"/>
+      
+      <param name="optimization/lambda_smooth" value="1.0" type="double"/>
+      <param name="optimization/lambda_collision" value="0.5" type="double"/>
+      <param name="optimization/lambda_feasibility" value="0.1" type="double"/>
+      <param name="optimization/lambda_curvature" value="0.1" type="double"/>
+      <param name="optimization/lambda_fitness" value="1.0" type="double"/>
+      <param name="optimization/dist0" value="0.5" type="double"/>
+      <param name="optimization/max_vel" value="15.0" type="double"/>
+      <param name="optimization/min_vel" value="10.0" type="double"/>
+      <param name="optimization/max_acc" value="5" type="double"/>
+      <param name="optimization/control_points_distance" value="5.0" type="double"/>
 
   </node>
 

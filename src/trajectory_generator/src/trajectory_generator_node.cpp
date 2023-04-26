@@ -28,6 +28,7 @@ using namespace Eigen;
 
 TrajectoryGeneratorWaypoint *_trajGene = new TrajectoryGeneratorWaypoint();
 AstarPathFinder *_astar_path_finder = new AstarPathFinder();
+ros::NodeHandle nh("~");
 
 // Set the obstacle map
 double _resolution, _inv_resolution, _path_resolution;
@@ -39,6 +40,10 @@ int _max_x_id, _max_y_id, _max_z_id;
 double _vis_traj_width;
 double _Vel, _Acc;
 int _dev_order, _min_order;
+
+////////////////////////
+int num_cp;
+////////////////////////
 
 // ros related
 ros::Subscriber _map_sub, _pts_sub, _odom_sub;
@@ -479,7 +484,6 @@ Vector3d getVel(double t_cur) {
 
 int main(int argc, char **argv) {
   ros::init(argc, argv, "traj_node");
-  ros::NodeHandle nh("~");
 
   nh.param("planning/vel", _Vel, 1.0);
   nh.param("planning/acc", _Acc, 1.0);
@@ -493,6 +497,7 @@ int main(int argc, char **argv) {
   nh.param("path/resolution", _path_resolution, 0.05);
   nh.param("replanning/thresh_replan", replan_thresh, -1.0);
   nh.param("replanning/thresh_no_replan", no_replan_thresh, -1.0);
+  num_cp = 40;
 
   _poly_num1D = 2 * _dev_order;
 
