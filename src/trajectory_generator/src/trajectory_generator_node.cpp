@@ -23,7 +23,8 @@
 #include "Astar_searcher.h"
 #include "backward.hpp"
 #include "trajectory_generator_waypoint.h"
-#include "traj_server.h"
+#include "uniform_bspline.h"
+//#include "traj_server.h"
 
 using namespace std;
 using namespace Eigen;
@@ -556,7 +557,7 @@ int main(int argc, char **argv) {
   _max_z_id = (int)(_z_size * _inv_resolution);
 
   _astar_path_finder = new AstarPathFinder();
-  TrajectoryServer server(nh);
+  //TrajectoryServer server(nh);
   _astar_path_finder->initGridMap(_resolution, _map_lower, _map_upper,
                                   _max_x_id, _max_y_id, _max_z_id);
 

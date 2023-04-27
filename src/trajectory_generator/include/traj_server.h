@@ -42,7 +42,11 @@ private:
     // configuration for trajectory
     int _n_segment = 0;
     int _traj_id = 0;
-    vector<UniformBspline> traj;
+    ///////////////////
+    vector<UniformBspline> traj_;
+    ros::Time start_time_;
+    int traj_id_;
+    //////////////////
     uint32_t _traj_flag = 0;
     Eigen::VectorXd _time;
     Eigen::MatrixXd _coef[3];
@@ -195,7 +199,7 @@ public:
         pubPositionCommand();
     }
 
-    void rcvTrajectoryCallabck(const quadrotor_msgs::PolynomialTrajectory & traj)
+    void rcvTrajectoryCallabck(/*const quadrotor_msgs::PolynomialTrajectory & traj*/quadrotor_msgs::Bspline & msg)
     {
         //ROS_WARN("[SERVER] Recevied The Trajectory with %.3lf.", _start_time.toSec());
         //ROS_WARN("[SERVER] Now the odom time is : ");
@@ -210,7 +214,7 @@ public:
                 return;
             }
             if ((int)traj.trajectory_id < _traj_id) return ;
-
+            /*
             state = TRAJ;
             _traj_flag = quadrotor_msgs::PositionCommand::TRAJECTORY_STATUS_READY;
             _traj_id = traj.trajectory_id;
@@ -251,6 +255,21 @@ public:
 
                 shift += (order + 1);
             }
+            */
+            Eigen::MatrixXd pos_pts(3, msg.pos_pts.size());
+            Eigen::VectorXd knots(msg->knots.size());
+            for (size_t i = 0; i < msg.knots.size(); ++i)
+            {
+                knots(i) = msg.knots[i];
+            }
+            for (size_t i = 0; i < msg.pos_pts.size(); ++i)
+            {
+                pos_pts(0, i) = msg.pos_pts[i].x;
+                pos_pts(1, i) = msg.pos_pts[i].y;
+                pos_pts(2, i) = msg.pos_pts[i].z;
+            }
+            UniformBspline pos_traj(pos_pts, msg.order, 0.1);
+            pos_traj.setKnot(knots);
         }
         else if (traj.action == quadrotor_msgs::PolynomialTrajectory::ACTION_ABORT) 
         {
