@@ -10,6 +10,7 @@
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <quadrotor_msgs/PolynomialTrajectory.h>
+#include <quadrotor_msgs/Bspline.h>
 #include <random>
 #include <ros/console.h>
 #include <ros/ros.h>
@@ -22,6 +23,7 @@
 #include "Astar_searcher.h"
 #include "backward.hpp"
 #include "trajectory_generator_waypoint.h"
+#include "traj_server.h"
 
 using namespace std;
 using namespace Eigen;
@@ -48,6 +50,7 @@ int num_cp;
 // ros related
 ros::Subscriber _map_sub, _pts_sub, _odom_sub;
 ros::Publisher _traj_vis_pub, _traj_pub, _path_vis_pub;
+ros::Publisher bspline_pub;
 
 // for planning
 Vector3d odom_pt, odom_vel, start_pt, target_pt, start_vel;
@@ -209,6 +212,32 @@ void rcvWaypointsCallBack(const nav_msgs::Path &wp) {
     changeState(REPLAN_TRAJ, "STATE");
 }
 
+void bspline_traj_pub(UniformBspline* uniform_bspline_ptr)
+{
+  quadrotor_msgs::Bspline bspline;
+  bspline.order = 3;
+  bspline.start_time = ros::Time::now();
+  bspline.traj_id = 1;
+  Eigen::MatrixXd pos_pts = uniform_bspline_ptr->getControlPoint();
+  bspline.pos_pts.reserve(pos_pts.cols());
+  for (int i = 0; i < pos_pts.cols(); ++i)
+  {
+    geometry_msgs::Point pt;
+    pt.x = pos_pts(0, i);
+    pt.y = pos_pts(1, i);
+    pt.z = pos_pts(2, i);
+    bspline.pos_pts.push_back(pt);
+  }
+  Eigen::VectorXd knots = uniform_bspline_ptr->getKnot();
+  bspline.knots.reserve(knots.rows());
+  for (int i = 0; i < knots.rows(); ++i)
+  {
+    bspline.knots.push_back(knots(i));
+  }
+
+  bspline_pub.publish(bspline);
+}
+
 void rcvPointCloudCallBack(const sensor_msgs::PointCloud2 &pointcloud_map) {
 
   pcl::PointCloud<pcl::PointXYZ> cloud;
@@ -239,6 +268,12 @@ bool trajGeneration() {
    * **/
   _astar_path_finder->AstarGraphSearch(start_pt, target_pt);
   auto grid_path = _astar_path_finder->getPath();
+  BsplineOpt bspline_opt;
+  bspline_opt.set_param(nh);
+  bspline_opt.set_bspline(grid_path);
+  UniformBspline bspline(bspline_opt.get_bspline());
+  bspline_traj_pub(&bspline);
+
   printf("Get A* path\n");
   // Reset map for next call
 
@@ -511,7 +546,7 @@ int main(int argc, char **argv) {
       nh.advertise<quadrotor_msgs::PolynomialTrajectory>("trajectory", 50);
   _traj_vis_pub = nh.advertise<visualization_msgs::Marker>("vis_trajectory", 1);
   _path_vis_pub = nh.advertise<visualization_msgs::Marker>("vis_path", 1);
-
+  bspline_pub = nh.advertise<quadrotor_msgs::Bspline>("bspline_trajectory", 10);
   // set the obstacle map
   _map_lower << -_x_size / 2.0, -_y_size / 2.0, 0.0;
   _map_upper << +_x_size / 2.0, +_y_size / 2.0, _z_size;
@@ -521,6 +556,7 @@ int main(int argc, char **argv) {
   _max_z_id = (int)(_z_size * _inv_resolution);
 
   _astar_path_finder = new AstarPathFinder();
+  TrajectoryServer server(nh);
   _astar_path_finder->initGridMap(_resolution, _map_lower, _map_upper,
                                   _max_x_id, _max_y_id, _max_z_id);
 

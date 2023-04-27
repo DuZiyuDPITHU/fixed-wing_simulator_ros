@@ -73,6 +73,7 @@ add_message_files(
   TRPYCommand.msg
   Odometry.msg
   PolynomialTrajectory.msg
+  Bspline.msg
   LQRTrajectory.msg
 )
 

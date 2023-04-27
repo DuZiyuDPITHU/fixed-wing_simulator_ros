@@ -13,7 +13,7 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <visualization_msgs/Marker.h>
 #include <sensor_msgs/PointCloud2.h>
-//#include <trajectory_generator/uniform_bspline.h>
+#include "uniform_bspline.h"
 
 const int  _DIM_x = 0;
 const int  _DIM_y = 1;
@@ -42,7 +42,7 @@ private:
     // configuration for trajectory
     int _n_segment = 0;
     int _traj_id = 0;
-    //vector<UniformBspline> traj;
+    vector<UniformBspline> traj;
     uint32_t _traj_flag = 0;
     Eigen::VectorXd _time;
     Eigen::MatrixXd _coef[3];
@@ -471,15 +471,3 @@ public:
         _vis_acc_pub.publish(_vis_acc);
     }
 };
-
-int main(int argc, char ** argv)
-{
-    ros::init(argc, argv, "gradient_trajectory_server_node");
-    ros::NodeHandle handle("~");
-
-    TrajectoryServer server(handle);
-
-    ros::spin();
-
-    return 0;
-}

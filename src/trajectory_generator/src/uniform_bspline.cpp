@@ -417,3 +417,8 @@ void BsplineOpt::set_bspline(std::vector<Eigen::Vector3d> A_Star_Path)
   double ts = cp_dist_ / max_vel_ * 5;
   bspline = UniformBspline(control_points, order_, ts);
 }
+
+UniformBspline BsplineOpt::get_bspline()
+{
+  return this->bspline;
+}

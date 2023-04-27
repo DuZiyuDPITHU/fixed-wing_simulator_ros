@@ -11,20 +11,23 @@ find_package(catkin REQUIRED COMPONENTS
     nav_msgs
     sensor_msgs
     quadrotor_msgs
-    tf)
+    tf
+    trajectory_generator)
 
 find_package(Eigen3 REQUIRED)
 find_package(PCL REQUIRED)
 
 catkin_package(
-  # INCLUDE_DIRS include
+   #INCLUDE_DIRS include
+   CATKIN_DEPENDS trajectory_generator
 )
 
 include_directories(
     include
     ${catkin_INCLUDE_DIRS}
     ${EIGEN3_INCLUDE_DIR}
-    ${PCL_INCLUDE_DIRS})
+    ${PCL_INCLUDE_DIRS}
+    ${PROJECT_SOURCE_DIR}/include)
 
 link_directories(
     ${PCL_LIBRARY_DIRS})
