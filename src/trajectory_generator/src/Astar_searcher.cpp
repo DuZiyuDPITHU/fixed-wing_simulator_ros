@@ -346,6 +346,7 @@ vector<Vector3d> AstarPathFinder::getPath() {
     path.push_back(temp->coord);
   }
   // Du: Implement A* traceback
+  printf("get A* path\n");
 
   return path;
 }

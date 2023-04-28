@@ -31,7 +31,6 @@ using namespace Eigen;
 
 TrajectoryGeneratorWaypoint *_trajGene = new TrajectoryGeneratorWaypoint();
 AstarPathFinder *_astar_path_finder = new AstarPathFinder();
-ros::NodeHandle nh("~");
 
 // Set the obstacle map
 double _resolution, _inv_resolution, _path_resolution;
@@ -46,6 +45,7 @@ int _dev_order, _min_order;
 
 ////////////////////////
 int num_cp;
+ros::NodeHandle* nh_ptr;
 ////////////////////////
 
 // ros related
@@ -267,12 +267,14 @@ bool trajGeneration() {
    * STEP 1:  search the path and get the path
    *
    * **/
+  ROS_WARN("generate trajectory\n");
   _astar_path_finder->AstarGraphSearch(start_pt, target_pt);
   auto grid_path = _astar_path_finder->getPath();
   BsplineOpt bspline_opt;
-  bspline_opt.set_param(nh);
+  bspline_opt.set_param(nh_ptr);
   bspline_opt.set_bspline(grid_path);
   UniformBspline bspline(bspline_opt.get_bspline());
+  std::cout<<bspline.get_control_points()<<std::endl;
   bspline_traj_pub(&bspline);
 
   printf("Get A* path\n");
@@ -520,6 +522,8 @@ Vector3d getVel(double t_cur) {
 
 int main(int argc, char **argv) {
   ros::init(argc, argv, "traj_node");
+  ros::NodeHandle nh("~");
+  nh_ptr = &nh;
 
   nh.param("planning/vel", _Vel, 1.0);
   nh.param("planning/acc", _Acc, 1.0);

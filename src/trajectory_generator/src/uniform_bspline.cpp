@@ -372,24 +372,26 @@ void UniformBspline::getMeanAndMaxAcc(double &mean_a, double &max_a)
   max_a = max_acc;
 }
 
-void BsplineOpt::set_param(ros::NodeHandle &nh)
+void BsplineOpt::set_param(ros::NodeHandle* nh)
 {
-  nh.param("optimization/lambda_smooth", lambda1_, -1.0);
-  nh.param("optimization/lambda_collision", lambda2_, -1.0);
-  nh.param("optimization/lambda_feasibility", lambda3_, -1.0);
-  nh.param("optimization/lambda_curvature", lambda4_, -1.0);
-  nh.param("optimization/lambda_fitness", lambda5_, -1.0);
-
-  nh.param("optimization/dist0", dist0_, -1.0);
-  nh.param("optimization/max_vel", max_vel_, -1.0);
-  nh.param("optimization/max_acc", max_acc_, -1.0);
-  nh.param("optimization/min_vel", min_vel, -1.0);
-  nh.param("optimization/order_", order_, 3);
-  nh.param("optimization/control_points_distance", cp_dist_, 5.0);
+  printf("setting bspline param\n");
+  nh->param("optimization/lambda_smooth", lambda1_, -1.0);
+  nh->param("optimization/lambda_collision", lambda2_, -1.0);
+  nh->param("optimization/lambda_feasibility", lambda3_, -1.0);
+  nh->param("optimization/lambda_curvature", lambda4_, -1.0);
+  nh->param("optimization/lambda_fitness", lambda5_, -1.0);
+  
+  nh->param("optimization/dist0", dist0_, -1.0);
+  nh->param("optimization/max_vel", max_vel_, -1.0);
+  nh->param("optimization/max_acc", max_acc_, -1.0);
+  nh->param("optimization/min_vel", min_vel, -1.0);
+  nh->param("optimization/order_", order_, 3);
+  nh->param("optimization/control_points_distance", cp_dist_, 5.0);
 }
 
 void BsplineOpt::set_bspline(std::vector<Eigen::Vector3d> A_Star_Path)
 {
+  printf("setting bspline\n");
   start_pt_ = A_Star_Path.front();
   end_pt_ = A_Star_Path.back();
   double dist_count = 0;
@@ -409,10 +411,16 @@ void BsplineOpt::set_bspline(std::vector<Eigen::Vector3d> A_Star_Path)
   {
     points.push_back(end_pt_);
   }
-  Eigen::MatrixXd control_points(points.size(), 3);
+  printf("setting control points\n");
+  Eigen::MatrixXd control_points(int(points.size()), 3);
   for (int i=0; i<points.size(); i++)
   {
-    control_points.row(i) << points[i];
+    std::cout << points[i] << std::endl;
+    for (int j=0;j<order_;j++)
+    {
+      //control_points.row(i) << points[i];
+      control_points(i, j) = double(points[i](j));
+    }
   }
   double ts = cp_dist_ / max_vel_ * 5;
   bspline = UniformBspline(control_points, order_, ts);

@@ -93,9 +93,9 @@ private:
 
     UniformBspline bspline;
 public:
-    BsplineOpt() {};
+    BsplineOpt() {printf("initializing bspline optimizer\n");};
     ~BsplineOpt() {};
-    void set_param(ros::NodeHandle &nh);
+    void set_param(ros::NodeHandle* nh);
     void set_bspline(std::vector<Eigen::Vector3d> cps);
     UniformBspline get_bspline();
 };
