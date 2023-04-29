@@ -51,7 +51,8 @@ target_link_libraries(trajectory_generator_node
    ${PCL_LIBRARIES}
 )
 
-add_executable(traj_server src/traj_server.cpp
+add_executable(trajectory_server 
+  src/traj_server.cpp
   src/uniform_bspline.cpp)
-target_link_libraries(traj_server ${catkin_LIBRARIES})
+target_link_libraries(trajectory_server ${catkin_LIBRARIES})
 #add_dependencies(traj_server ${${PROJECT_NAME}_EXPORTED_TARGETS})

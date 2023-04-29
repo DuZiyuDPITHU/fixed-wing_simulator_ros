@@ -415,7 +415,6 @@ void BsplineOpt::set_bspline(std::vector<Eigen::Vector3d> A_Star_Path)
   Eigen::MatrixXd control_points(int(points.size()), 3);
   for (int i=0; i<points.size(); i++)
   {
-    std::cout << points[i] << std::endl;
     for (int j=0;j<order_;j++)
     {
       //control_points.row(i) << points[i];

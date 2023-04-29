@@ -221,6 +221,8 @@ void bspline_traj_pub(UniformBspline* uniform_bspline_ptr)
   bspline.traj_id = 1;
   Eigen::MatrixXd pos_pts = uniform_bspline_ptr->getControlPoint();
   bspline.pos_pts.reserve(pos_pts.cols());
+  printf("Trajectory_generator: publishing bspline traj\n");
+  std::cout << pos_pts << std::endl;
   for (int i = 0; i < pos_pts.cols(); ++i)
   {
     geometry_msgs::Point pt;
@@ -291,11 +293,13 @@ bool trajGeneration() {
     path.row(k) = grid_path[k];
   }
   printf("Simplify A* traj.\n");
+  return true;
   /**
    *
    * STEP 3:  Trajectory optimization
    *
    * **/
+  /*
   trajOptimization(path);
   time_duration = _polyTime.sum();
 
@@ -308,6 +312,7 @@ bool trajGeneration() {
     return true;
   else
     return false;
+    */
 }
 
 void trajOptimization(Eigen::MatrixXd path) {

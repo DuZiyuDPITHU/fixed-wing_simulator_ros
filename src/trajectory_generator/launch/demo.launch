@@ -48,7 +48,7 @@
   </node>
 
   <!-- Trajectory Command server -->
-  <node pkg="traj_server" type="traj_server_node" name="traj_server" output="screen" launch-prefix="">
+  <node pkg="trajectory_generator" type="trajectory_server" name="trajectory_server" output="screen" launch-prefix="">
         <remap from="~/odometry" to="/visual_slam/odom"/>
         <remap from="~/trajectory" to="/trajectory_generator_node/trajectory"/>
   </node>
