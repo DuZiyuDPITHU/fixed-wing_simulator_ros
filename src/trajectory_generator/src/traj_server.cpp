@@ -29,6 +29,7 @@ void bsplineCallback(quadrotor_msgs::BsplineConstPtr msg)
   Eigen::MatrixXd pos_pts(3, msg->pos_pts.size());
 
   Eigen::VectorXd knots(msg->knots.size());
+  printf("points size: %d, knots size: %d\n", msg->pos_pts.size(), msg->knots.size());
   for (size_t i = 0; i < msg->knots.size(); ++i)
   {
     knots(i) = msg->knots[i];
@@ -64,7 +65,7 @@ void bsplineCallback(quadrotor_msgs::BsplineConstPtr msg)
   traj_duration_ = traj_[0].getTimeSum();
 
   receive_traj_ = true;
-  printf("received bspline traj\n");
+  printf("received bspline traj for %f\n", traj_duration_);
 }
 
 std::pair<double, double> calculate_yaw(double t_cur, Eigen::Vector3d &pos, ros::Time &time_now, ros::Time &time_last)
@@ -76,7 +77,7 @@ std::pair<double, double> calculate_yaw(double t_cur, Eigen::Vector3d &pos, ros:
   double yaw = 0;
   double yawdot = 0;
 
-  Eigen::Vector3d dir = t_cur + time_forward_ <= traj_duration_ ? traj_[0].evaluateDeBoorT(t_cur + time_forward_) - pos : traj_[0].evaluateDeBoorT(traj_duration_) - pos;
+  Eigen::Vector3d dir = t_cur + time_forward_ <= traj_duration_ ? pos - traj_[0].evaluateDeBoorT(t_cur + time_forward_) : pos - traj_[0].evaluateDeBoorT(traj_duration_);
   double yaw_temp = dir.norm() > 0.1 ? atan2(dir(1), dir(0)) : last_yaw_;
   double max_yaw_change = YAW_DOT_MAX_PER_SEC * (time_now - time_last).toSec();
   if (yaw_temp - last_yaw_ > PI)
@@ -164,24 +165,25 @@ void cmdCallback(const ros::TimerEvent &e)
   /* no publishing before receive traj_ */
   if (!receive_traj_)
     return;
-  printf("calulating so3 control cmd\n");
+
   ros::Time time_now = ros::Time::now();
   double t_cur = (time_now - start_time_).toSec();
+  //printf("time now: %f, t_cur: %f, traj duration: %f\n", time_now.toSec(), t_cur, traj_duration_);
 
   Eigen::Vector3d pos(Eigen::Vector3d::Zero()), vel(Eigen::Vector3d::Zero()), acc(Eigen::Vector3d::Zero()), pos_f;
   std::pair<double, double> yaw_yawdot(0, 0);
-  printf("a\n");
+
   static ros::Time time_last = ros::Time::now();
   if (t_cur < traj_duration_ && t_cur >= 0.0)
   {
     pos = traj_[0].evaluateDeBoorT(t_cur);
     vel = traj_[1].evaluateDeBoorT(t_cur);
     acc = traj_[2].evaluateDeBoorT(t_cur);
-    printf("a\n");
+
     /*** calculate yaw ***/
     yaw_yawdot = calculate_yaw(t_cur, pos, time_now, time_last);
     /*** calculate yaw ***/
-    printf("a\n");
+
     double tf = min(traj_duration_, t_cur + 2.0);
     pos_f = traj_[0].evaluateDeBoorT(tf);
   }
@@ -191,7 +193,7 @@ void cmdCallback(const ros::TimerEvent &e)
     pos = traj_[0].evaluateDeBoorT(traj_duration_);
     vel.setZero();
     acc.setZero();
-    printf("a\n");
+
     yaw_yawdot.first = last_yaw_;
     yaw_yawdot.second = 0;
 
@@ -202,12 +204,12 @@ void cmdCallback(const ros::TimerEvent &e)
     cout << "[Traj server]: invalid time." << endl;
   }
   time_last = time_now;
-  printf("b\n");
+
   cmd.header.stamp = time_now;
   cmd.header.frame_id = "world";
   cmd.trajectory_flag = quadrotor_msgs::PositionCommand::TRAJECTORY_STATUS_READY;
   cmd.trajectory_id = traj_id_;
-  printf("a\n");
+
   cmd.position.x = pos(0);
   cmd.position.y = pos(1);
   cmd.position.z = pos(2);
@@ -219,13 +221,14 @@ void cmdCallback(const ros::TimerEvent &e)
   cmd.acceleration.x = acc(0);
   cmd.acceleration.y = acc(1);
   cmd.acceleration.z = acc(2);
-  printf("a\n");
+
   cmd.yaw = yaw_yawdot.first;
   cmd.yaw_dot = yaw_yawdot.second;
 
   last_yaw_ = cmd.yaw;
-  printf("a\n");
+
   pos_cmd_pub.publish(cmd);
+  //printf("cmd published\n");
 }
 
 int main(int argc, char **argv)
@@ -236,7 +239,7 @@ int main(int argc, char **argv)
   printf("start traj server node\n");
   ros::Subscriber bspline_sub = node.subscribe("trajectory_generator_node/bspline_trajectory", 10, bsplineCallback);
 
-  pos_cmd_pub = node.advertise<quadrotor_msgs::PositionCommand>("position_command", 50);
+  pos_cmd_pub = node.advertise<quadrotor_msgs::PositionCommand>("position_cmd", 50);
 
   ros::Timer cmd_timer = node.createTimer(ros::Duration(0.01), cmdCallback);
 

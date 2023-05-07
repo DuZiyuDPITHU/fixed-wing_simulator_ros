@@ -36,6 +36,7 @@ void UniformBspline::setUniformBspline(const Eigen::MatrixXd &points, const int 
       u_(i) = u_(i - 1) + interval_;
     }
   }
+  //std::cout<< "u_: " << u_ <<std::endl;
 }
 
 void UniformBspline::setKnot(const Eigen::VectorXd &knot) { this->u_ = knot; }
@@ -49,7 +50,7 @@ bool UniformBspline::getTimeSpan(double &um, double &um_p)
 
   um = u_(p_);
   um_p = u_(m_ - p_);
-
+  printf("time span: %f\n", um_p-um);
   return true;
 }
 
@@ -391,7 +392,7 @@ void BsplineOpt::set_param(ros::NodeHandle* nh)
 
 void BsplineOpt::set_bspline(std::vector<Eigen::Vector3d> A_Star_Path)
 {
-  printf("setting bspline\n");
+  //printf("setting bspline\n");
   start_pt_ = A_Star_Path.front();
   end_pt_ = A_Star_Path.back();
   double dist_count = 0;
@@ -411,18 +412,20 @@ void BsplineOpt::set_bspline(std::vector<Eigen::Vector3d> A_Star_Path)
   {
     points.push_back(end_pt_);
   }
-  printf("setting control points\n");
+  //printf("setting control points\n");
   Eigen::MatrixXd control_points(int(points.size()), 3);
-  for (int i=0; i<points.size(); i++)
+  int count = 0;
+  for (int i=points.size()-1; i>=0; i--)
   {
     for (int j=0;j<order_;j++)
     {
       //control_points.row(i) << points[i];
-      control_points(i, j) = double(points[i](j));
+      control_points(count, j) = double(points[i](j));
     }
+    count ++;
   }
   double ts = cp_dist_ / max_vel_ * 5;
-  bspline = UniformBspline(control_points, order_, ts);
+  bspline = UniformBspline(control_points.transpose(), order_, ts);
 }
 
 UniformBspline BsplineOpt::get_bspline()

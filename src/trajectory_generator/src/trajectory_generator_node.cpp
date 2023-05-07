@@ -62,6 +62,8 @@ double time_duration;
 ros::Time time_traj_start;
 bool has_odom = false;
 bool has_target = false;
+UniformBspline cur_bspline_traj;
+UniformBspline cur_bspline_vel;
 
 // for replanning
 enum STATE {
@@ -162,7 +164,7 @@ void execCallback(const ros::TimerEvent &e) {
   case EXEC_TRAJ: {
     ros::Time time_now = ros::Time::now();
     double t_cur = (time_now - time_traj_start).toSec();
-    double t_replan = ros::Duration(1, 0).toSec();
+    double t_replan = ros::Duration(2, 0).toSec();
     t_cur = min(time_duration, t_cur);
 
     if (t_cur > time_duration - 1e-2) {
@@ -176,6 +178,7 @@ void execCallback(const ros::TimerEvent &e) {
     } else if (t_cur < t_replan) {
       return;
     } else {
+      printf("replan due to replan time out\n");
       changeState(REPLAN_TRAJ, "STATE");
     }
     break;
@@ -183,10 +186,14 @@ void execCallback(const ros::TimerEvent &e) {
   case REPLAN_TRAJ: {
     ros::Time time_now = ros::Time::now();
     double t_cur = (time_now - time_traj_start).toSec();
-    double t_delta = ros::Duration(0, 50).toSec();
+    double t_delta = ros::Duration(0, 10).toSec();
     t_cur = t_delta + t_cur;
-    start_pt = getPos(t_cur);
-    start_vel = getVel(t_cur);
+    //start_pt = getPos(t_cur);
+    //start_vel = getVel(t_cur);
+    start_pt = cur_bspline_traj.evaluateDeBoorT(t_cur);
+    start_vel = cur_bspline_vel.evaluateDeBoorT(t_cur);
+    std::cout<< "current time: " << t_cur << std::endl << start_pt.transpose() << std::endl;
+    //start_vel = odom_vel;
     bool success = trajGeneration();
     if (success)
       changeState(EXEC_TRAJ, "STATE");
@@ -209,8 +216,9 @@ void rcvWaypointsCallBack(const nav_msgs::Path &wp) {
 
   if (exec_state == WAIT_TARGET)
     changeState(GEN_NEW_TRAJ, "STATE");
-  else if (exec_state == EXEC_TRAJ)
-    changeState(REPLAN_TRAJ, "STATE");
+  else if (exec_state == EXEC_TRAJ){
+    printf("replan due to rcv waypoint\n");
+    changeState(REPLAN_TRAJ, "STATE");}
 }
 
 void bspline_traj_pub(UniformBspline* uniform_bspline_ptr)
@@ -220,6 +228,7 @@ void bspline_traj_pub(UniformBspline* uniform_bspline_ptr)
   bspline.start_time = ros::Time::now();
   bspline.traj_id = 1;
   Eigen::MatrixXd pos_pts = uniform_bspline_ptr->getControlPoint();
+  
   bspline.pos_pts.reserve(pos_pts.cols());
   printf("Trajectory_generator: publishing bspline traj\n");
   std::cout << pos_pts << std::endl;
@@ -232,6 +241,8 @@ void bspline_traj_pub(UniformBspline* uniform_bspline_ptr)
     bspline.pos_pts.push_back(pt);
   }
   Eigen::VectorXd knots = uniform_bspline_ptr->getKnot();
+  if (knots.rows() <= 7)
+    return;
   bspline.knots.reserve(knots.rows());
   for (int i = 0; i < knots.rows(); ++i)
   {
@@ -269,16 +280,21 @@ bool trajGeneration() {
    * STEP 1:  search the path and get the path
    *
    * **/
-  ROS_WARN("generate trajectory\n");
+  _astar_path_finder->resetUsedGrids();
   _astar_path_finder->AstarGraphSearch(start_pt, target_pt);
   auto grid_path = _astar_path_finder->getPath();
   BsplineOpt bspline_opt;
   bspline_opt.set_param(nh_ptr);
   bspline_opt.set_bspline(grid_path);
   UniformBspline bspline(bspline_opt.get_bspline());
-  std::cout<<bspline.get_control_points()<<std::endl;
+  //std::cout<<bspline.get_control_points()<<std::endl;
+  time_traj_start = ros::Time::now();
+  time_duration = bspline.getTimeSum();
   bspline_traj_pub(&bspline);
 
+  cur_bspline_traj = bspline;
+  cur_bspline_vel = cur_bspline_traj.getDerivative();
+  
   printf("Get A* path\n");
   // Reset map for next call
 

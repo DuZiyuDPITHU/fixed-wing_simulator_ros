@@ -224,7 +224,7 @@ double AstarPathFinder::getHeu(GridNodePtr node1, GridNodePtr node2, GridNodePtr
 
 void AstarPathFinder::AstarGraphSearch(Vector3d start_pt, Vector3d end_pt) {
   ros::Time time_1 = ros::Time::now();
-  printf("Start Graph Search\n");
+  std::cout<< "generate trajectory from " << start_pt.transpose() << " to " << end_pt.transpose() << std::endl;
   // index of start_point and end_point
   Vector3i start_idx = coord2gridIndex(start_pt);
   Vector3i end_idx = coord2gridIndex(end_pt);
@@ -268,12 +268,13 @@ void AstarPathFinder::AstarGraphSearch(Vector3d start_pt, Vector3d end_pt) {
   double tentative_gScore;
   vector<GridNodePtr> neighborPtrSets;
   vector<double> edgeCostSets;
-
+  printf("enter A* main loop\n");
   /**
    *
    * STEP 1.3:  finish the loop
    *
    * **/
+  int count = 0;
   while (!openSet.empty()) {
     // Du: Implement A* main loop
     /*
@@ -281,6 +282,8 @@ void AstarPathFinder::AstarGraphSearch(Vector3d start_pt, Vector3d end_pt) {
       startPtr, endPtr, currentPtr: GridNodePtr
     */
     // get pt with max priority
+    count ++;
+    printf("loop : %d, open set size: %d\n",count ,openSet.size());
     double min_fScore = openSet.begin()->first;
     currentPtr = openSet.begin()->second;
     // move current ptr from openset to closeset
@@ -313,6 +316,7 @@ void AstarPathFinder::AstarGraphSearch(Vector3d start_pt, Vector3d end_pt) {
           double succfScore = this->getHeu(succPtr, endPtr, startPtr);
           succPtr->gScore = succgScore;
           succPtr->fScore = succfScore;
+          succPtr->id = 1;
           openSet.insert(make_pair(succfScore, succPtr));
         }
       } 

@@ -95,6 +95,7 @@ void
 SO3ControlNodelet::position_cmd_callback(
   const quadrotor_msgs::PositionCommand::ConstPtr& cmd)
 {
+  //printf("receive cmd msgs\n");
   des_pos_ = Eigen::Vector3d(cmd->position.x, cmd->position.y, cmd->position.z);
   des_vel_ = Eigen::Vector3d(cmd->velocity.x, cmd->velocity.y, cmd->velocity.z);
   des_acc_ = Eigen::Vector3d(cmd->acceleration.x, cmd->acceleration.y,
@@ -201,7 +202,7 @@ SO3ControlNodelet::onInit(void)
   odom_sub_ = n.subscribe("odom", 10, &SO3ControlNodelet::odom_callback, this,
                           ros::TransportHints().tcpNoDelay());
   position_cmd_sub_ =
-    n.subscribe("position_cmd", 10, &SO3ControlNodelet::position_cmd_callback,
+    n.subscribe("/position_cmd", 10, &SO3ControlNodelet::position_cmd_callback,
                 this, ros::TransportHints().tcpNoDelay());
 
   enable_motors_sub_ =

@@ -60,7 +60,8 @@ Visualization Manager:
           Shaft Length: 1
           Shaft Radius: 0.0500000007
           Shape: Axes
-          Topic: /traj_server/desired_position
+          #Topic: /traj_server/desired_position
+          Topic: /odom_visualization/pose
           Unreliable: false
           Value: true
         - Class: rviz/Marker
@@ -136,7 +137,7 @@ Visualization Manager:
           Size (Pixels): 3
           Size (m): 0.100000001
           Style: Flat Squares
-          Topic: /pcl_render_node/global_map_vis
+          Topic: /random_complex/global_map
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true

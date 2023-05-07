@@ -39,9 +39,9 @@
       <param name="optimization/lambda_curvature" value="0.1" type="double"/>
       <param name="optimization/lambda_fitness" value="1.0" type="double"/>
       <param name="optimization/dist0" value="0.5" type="double"/>
-      <param name="optimization/max_vel" value="15.0" type="double"/>
-      <param name="optimization/min_vel" value="10.0" type="double"/>
-      <param name="optimization/max_acc" value="5" type="double"/>
+      <param name="optimization/max_vel" value="5.0" type="double"/>
+      <param name="optimization/min_vel" value="1.0" type="double"/>
+      <param name="optimization/max_acc" value="1.0" type="double"/>
       <param name="optimization/order_" value="3" type="int"/>
       <param name="optimization/control_points_distance" value="1.0" type="double"/>
 
