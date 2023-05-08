@@ -14,6 +14,7 @@ class AstarPathFinder
 
 	protected:
 		uint8_t * data;
+		uint8_t * flag;
 		GridNodePtr *** GridNodeMap;
 		double * EDT;
 		Eigen::Vector3i goalIdx;

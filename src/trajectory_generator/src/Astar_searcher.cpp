@@ -3,6 +3,11 @@
 using namespace std;
 using namespace Eigen;
 
+inline double norm2(Vector3i a, Vector3i b)
+{
+  return sqrt(double((a(0)-b(0))*(a(0)-b(0))+(a(1)-b(1))*(a(1)-b(1))+(a(2)-b(2))*(a(2)-b(2))));
+}
+
 void AstarPathFinder::initGridMap(double _resolution, Vector3d global_xyz_l,
                                   Vector3d global_xyz_u, int max_x_id,
                                   int max_y_id, int max_z_id) {
@@ -25,12 +30,13 @@ void AstarPathFinder::initGridMap(double _resolution, Vector3d global_xyz_l,
   inv_resolution = 1.0 / _resolution;
 
   data = new uint8_t[GLXYZ_SIZE];
+  flag = new uint8_t[GLXYZ_SIZE];
   EDT = new double[GLXYZ_SIZE];
   for (int i=0;i<GLXYZ_SIZE;i++)
   {
     EDT[i] = max_dist;
   }
-  
+  memset(flag, 0, GLXYZ_SIZE * sizeof(uint8_t));
   memset(data, 0, GLXYZ_SIZE * sizeof(uint8_t));
 
   GridNodeMap = new GridNodePtr **[GLX_SIZE];
@@ -144,10 +150,10 @@ void AstarPathFinder::updateEDT(vector<Vector3i> new_voxel)
     {
       Vector3i cur_pt = openSetFree.back();
       openSetFree.pop_back();
-      if ((cur_pt-pt).norm()<EDT[cur_pt(0)*GLYZ_SIZE+cur_pt(1)*GLZ_SIZE+cur_pt(2)])
+      if (norm2(cur_pt, pt)<EDT[cur_pt(0)*GLYZ_SIZE+cur_pt(1)*GLZ_SIZE+cur_pt(2)])
       {
-        //cout << "update EDT at "<< cur_pt.transpose() << "value: " << (cur_pt-pt).norm() << endl;
-        EDT[cur_pt(0)*GLYZ_SIZE+cur_pt(1)*GLZ_SIZE+cur_pt(2)] = (cur_pt-pt).norm();
+        //cout << "update EDT at "<< cur_pt.transpose() << "value: " << norm2(cur_pt, pt) << endl;
+        EDT[cur_pt(0)*GLYZ_SIZE+cur_pt(1)*GLZ_SIZE+cur_pt(2)] = norm2(cur_pt, pt);
         //pt_succ.clear();
         VoxelGetSucc(cur_pt, pt_succ);
         while (!pt_succ.empty())
@@ -158,15 +164,17 @@ void AstarPathFinder::updateEDT(vector<Vector3i> new_voxel)
         }
       }
     }
-    //std::printf("updated free space\n");
+    std::printf("updated free space\n");
     while (!openSetOccupy.empty())
     {
       Vector3i cur_pt = openSetOccupy.back();
       openSetOccupy.pop_back();
       //pt_succ.clear();
       VoxelGetSucc(cur_pt, pt_succ);
+      //printf("a\n");
       while (!pt_succ.empty())
       {
+        //printf("%d\n", pt_succ.size());
         Vector3i temp_pt = pt_succ.back();
         pt_succ.pop_back();
         if (isOccupied(temp_pt))
@@ -175,13 +183,13 @@ void AstarPathFinder::updateEDT(vector<Vector3i> new_voxel)
           if (min_dist > -EDT[temp_pt(0)*GLYZ_SIZE+temp_pt(1)*GLZ_SIZE+temp_pt(2)])
           {
             EDT[temp_pt(0)*GLYZ_SIZE+temp_pt(1)*GLZ_SIZE+temp_pt(2)] = -min_dist;
-            cout << "update EDT at "<< temp_pt.transpose() << "value: " << -1*min_dist << endl;
+            //cout << "update EDT at "<< temp_pt.transpose() << "value: " << -1*min_dist << endl;
             openSetOccupy.push_back(temp_pt);
           }
         }
       }
     }
-    //std::printf("updated occupied space\n");
+    std::printf("updated occupied space\n");
   }
 
 }
@@ -190,42 +198,51 @@ double AstarPathFinder::getMinDist(Eigen::Vector3i & index)
 {
   if (isFree(index)) return 0.0;
   double temp_min_dist = max_dist;
+  memset(flag, 0, GLXYZ_SIZE * sizeof(uint8_t));
   vector<Vector3i> occupySet;
   vector<Vector3i> succSet;
   VoxelGetSucc(index, succSet);
+
   while (!succSet.empty())
   {
+    //printf("c\n");
     Vector3i temp_pt = succSet.back();
     succSet.pop_back();
     if (isOccupied(temp_pt))
     {
       occupySet.push_back(temp_pt);
+      flag[temp_pt(0)*GLYZ_SIZE+temp_pt(1)*GLZ_SIZE+temp_pt(2)] = 1;
     }
     else
     {
-      temp_min_dist = (temp_pt-index).norm();
+      temp_min_dist = norm2(temp_pt, index);
     }
   }
   while (!occupySet.empty())
   {
     //succSet.clear();
+    //printf("d\n");
     Vector3i this_pt = occupySet.back();
     occupySet.pop_back();
-    if ((this_pt-index).norm()>=temp_min_dist)
+    if (norm2(this_pt, index)>=temp_min_dist)
       continue;
     VoxelGetSucc(this_pt, succSet);
     while(!succSet.empty())
     {
       Vector3i temp_pt = succSet.back();
       succSet.pop_back();
+      if (flag[temp_pt(0)*GLYZ_SIZE+temp_pt(1)*GLZ_SIZE+temp_pt(2)]==1)
+       continue;
       if (isOccupied(temp_pt))
       {
         occupySet.push_back(temp_pt);
+        flag[temp_pt(0)*GLYZ_SIZE+temp_pt(1)*GLZ_SIZE+temp_pt(2)] = 1;
+        //cout<<temp_pt<<endl;
       }
       else
       {
-        if ((temp_pt-index).norm()<temp_min_dist)
-          temp_min_dist = (temp_pt-index).norm();
+        if (norm2(temp_pt, index)<temp_min_dist)
+          temp_min_dist = norm2(temp_pt, index);
       }
     }
   }
