@@ -8,6 +8,7 @@
         "/opt/ros/noetic/lib/python3/dist-packages"
     ],
     "files.associations": {
-        "complex": "cpp"
+        "complex": "cpp",
+        "iostream": "cpp"
     }
 }

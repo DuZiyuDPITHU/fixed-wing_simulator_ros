@@ -264,6 +264,7 @@ void rcvPointCloudCallBack(const sensor_msgs::PointCloud2 &pointcloud_map) {
     return;
 
   pcl::PointXYZ pt;
+  //printf("receive point cloud %d\n", (int)cloud.points.size());
   for (int idx = 0; idx < (int)cloud.points.size(); idx++) {
     pt = cloud.points[idx];
     // set obstalces into grid map for path planning

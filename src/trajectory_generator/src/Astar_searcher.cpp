@@ -25,18 +25,20 @@ void AstarPathFinder::initGridMap(double _resolution, Vector3d global_xyz_l,
   inv_resolution = 1.0 / _resolution;
 
   data = new uint8_t[GLXYZ_SIZE];
+  EDT = new double[GLXYZ_SIZE];
+  for (int i=0;i<GLXYZ_SIZE;i++)
+  {
+    EDT[i] = max_dist;
+  }
+  
   memset(data, 0, GLXYZ_SIZE * sizeof(uint8_t));
 
   GridNodeMap = new GridNodePtr **[GLX_SIZE];
-  EDT = new double **[GLX_SIZE];
   for (int i = 0; i < GLX_SIZE; i++) {
     GridNodeMap[i] = new GridNodePtr *[GLY_SIZE];
-    EDT[i] = new double *[GLY_SIZE];
     for (int j = 0; j < GLY_SIZE; j++) {
       GridNodeMap[i][j] = new GridNodePtr[GLZ_SIZE];
-      EDT[i][j] = new double [GLZ_SIZE];
       for (int k = 0; k < GLZ_SIZE; k++) {
-        EDT[i][j][k] = max_dist;
         Vector3i tmpIdx(i, j, k);
         Vector3d pos = gridIndex2coord(tmpIdx);
         GridNodeMap[i][j][k] = new GridNode(tmpIdx, pos);
@@ -61,6 +63,7 @@ void AstarPathFinder::resetUsedGrids() {
 
 void AstarPathFinder::setObs(const double coord_x, const double coord_y,
                              const double coord_z) {
+  //printf("setting obs\n");
   if (coord_x < gl_xl || coord_y < gl_yl || coord_z < gl_zl ||
       coord_x >= gl_xu || coord_y >= gl_yu || coord_z >= gl_zu)
     return;
@@ -121,8 +124,9 @@ void AstarPathFinder::updateEDT(vector<Vector3i> new_voxel)
 {
   while (!new_voxel.empty())
   {
+    //std::printf("ESDF: receive %d new voxels\n", new_voxel.size());
     Vector3i pt = new_voxel.back();
-    EDT[pt(0)*GLYZ_SIZE][pt(1)*GLZ_SIZE][pt(2)] = -getMinDist(pt);
+    EDT[pt(0)*GLYZ_SIZE+pt(1)*GLZ_SIZE+pt(2)] = -getMinDist(pt);
     new_voxel.pop_back();
     vector<Vector3i> pt_succ;
     VoxelGetSucc(pt, pt_succ);
@@ -140,10 +144,11 @@ void AstarPathFinder::updateEDT(vector<Vector3i> new_voxel)
     {
       Vector3i cur_pt = openSetFree.back();
       openSetFree.pop_back();
-      if ((cur_pt-pt).norm()<EDT[cur_pt(0)*GLYZ_SIZE][cur_pt(1)*GLZ_SIZE][cur_pt(2)])
+      if ((cur_pt-pt).norm()<EDT[cur_pt(0)*GLYZ_SIZE+cur_pt(1)*GLZ_SIZE+cur_pt(2)])
       {
-        EDT[cur_pt(0)*GLYZ_SIZE][cur_pt(1)*GLZ_SIZE][cur_pt(2)] = (cur_pt-pt).norm();
-        pt_succ.clear();
+        //cout << "update EDT at "<< cur_pt.transpose() << "value: " << (cur_pt-pt).norm() << endl;
+        EDT[cur_pt(0)*GLYZ_SIZE+cur_pt(1)*GLZ_SIZE+cur_pt(2)] = (cur_pt-pt).norm();
+        //pt_succ.clear();
         VoxelGetSucc(cur_pt, pt_succ);
         while (!pt_succ.empty())
         {
@@ -153,11 +158,12 @@ void AstarPathFinder::updateEDT(vector<Vector3i> new_voxel)
         }
       }
     }
+    //std::printf("updated free space\n");
     while (!openSetOccupy.empty())
     {
-      Vector3i cur_pt = openSetFree.back();
+      Vector3i cur_pt = openSetOccupy.back();
       openSetOccupy.pop_back();
-      pt_succ.clear();
+      //pt_succ.clear();
       VoxelGetSucc(cur_pt, pt_succ);
       while (!pt_succ.empty())
       {
@@ -166,14 +172,16 @@ void AstarPathFinder::updateEDT(vector<Vector3i> new_voxel)
         if (isOccupied(temp_pt))
         {
           double min_dist = getMinDist(temp_pt);
-          if (min_dist > -EDT[temp_pt(0)*GLYZ_SIZE][temp_pt(1)*GLZ_SIZE][temp_pt(2)])
+          if (min_dist > -EDT[temp_pt(0)*GLYZ_SIZE+temp_pt(1)*GLZ_SIZE+temp_pt(2)])
           {
-            EDT[temp_pt(0)*GLYZ_SIZE][temp_pt(1)*GLZ_SIZE][temp_pt(2)] = -min_dist;
+            EDT[temp_pt(0)*GLYZ_SIZE+temp_pt(1)*GLZ_SIZE+temp_pt(2)] = -min_dist;
+            cout << "update EDT at "<< temp_pt.transpose() << "value: " << -1*min_dist << endl;
             openSetOccupy.push_back(temp_pt);
           }
         }
       }
     }
+    //std::printf("updated occupied space\n");
   }
 
 }
@@ -200,7 +208,7 @@ double AstarPathFinder::getMinDist(Eigen::Vector3i & index)
   }
   while (!occupySet.empty())
   {
-    succSet.clear();
+    //succSet.clear();
     Vector3i this_pt = occupySet.back();
     occupySet.pop_back();
     if ((this_pt-index).norm()>=temp_min_dist)
@@ -453,7 +461,7 @@ void AstarPathFinder::AstarGraphSearch(Vector3d start_pt, Vector3d end_pt) {
     */
     // get pt with max priority
     count ++;
-    printf("loop : %d, open set size: %d\n",count ,openSet.size());
+    //printf("loop : %d, open set size: %d\n",count ,openSet.size());
     double min_fScore = openSet.begin()->first;
     currentPtr = openSet.begin()->second;
     // move current ptr from openset to closeset
