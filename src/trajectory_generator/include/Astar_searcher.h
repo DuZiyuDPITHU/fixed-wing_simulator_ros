@@ -15,6 +15,7 @@ class AstarPathFinder
 	protected:
 		uint8_t * data;
 		GridNodePtr *** GridNodeMap;
+		double *** EDT;
 		Eigen::Vector3i goalIdx;
 		int GLX_SIZE, GLY_SIZE, GLZ_SIZE;
 		int GLXYZ_SIZE, GLYZ_SIZE;
@@ -22,17 +23,20 @@ class AstarPathFinder
 		double resolution, inv_resolution;
 		double gl_xl, gl_yl, gl_zl;
 		double gl_xu, gl_yu, gl_zu;
+		double max_dist;
 
 		GridNodePtr terminatePtr;
 		std::multimap<double, GridNodePtr> openSet;
 
 		double getHeu(GridNodePtr node1, GridNodePtr node2, GridNodePtr start_node);
-		void AstarGetSucc(GridNodePtr currentPtr, std::vector<GridNodePtr> & neighborPtrSets, std::vector<double> & edgeCostSets);		
+		void AstarGetSucc(GridNodePtr currentPtr, std::vector<GridNodePtr> & neighborPtrSets, std::vector<double> & edgeCostSets);
+		void VoxelGetSucc(Eigen::Vector3i currentPt, std::vector<Eigen::Vector3i> & neighborSets);
 
     	bool isOccupied(const int & idx_x, const int & idx_y, const int & idx_z) const;
 		bool isOccupied(const Eigen::Vector3i & index) const;
 		bool isFree(const int & idx_x, const int & idx_y, const int & idx_z) const;
 		bool isFree(const Eigen::Vector3i & index) const;
+		double getMinDist(Eigen::Vector3i & index);
 		
 		Eigen::Vector3d gridIndex2coord(const Eigen::Vector3i & index);
 		Eigen::Vector3i coord2gridIndex(const Eigen::Vector3d & pt);
@@ -53,6 +57,7 @@ class AstarPathFinder
 		std::vector<Eigen::Vector3d> pathSimplify(const std::vector<Eigen::Vector3d> &path, const double path_resolution);
 		Eigen::Vector3d getPosPoly( Eigen::MatrixXd polyCoeff, int k, double t );
 		int safeCheck( Eigen::MatrixXd polyCoeff, Eigen::VectorXd time);
+		void updateEDT(std::vector<Eigen::Vector3i> new_voxel);
 };
 
 #endif

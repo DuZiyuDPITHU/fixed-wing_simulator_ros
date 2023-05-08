@@ -19,6 +19,7 @@ void AstarPathFinder::initGridMap(double _resolution, Vector3d global_xyz_l,
   GLZ_SIZE = max_z_id;
   GLYZ_SIZE = GLY_SIZE * GLZ_SIZE;
   GLXYZ_SIZE = GLX_SIZE * GLYZ_SIZE;
+  max_dist = 2*sqrt(GLX_SIZE*GLX_SIZE + GLY_SIZE*GLY_SIZE + GLZ_SIZE*GLZ_SIZE);
 
   resolution = _resolution;
   inv_resolution = 1.0 / _resolution;
@@ -27,11 +28,15 @@ void AstarPathFinder::initGridMap(double _resolution, Vector3d global_xyz_l,
   memset(data, 0, GLXYZ_SIZE * sizeof(uint8_t));
 
   GridNodeMap = new GridNodePtr **[GLX_SIZE];
+  EDT = new double **[GLX_SIZE];
   for (int i = 0; i < GLX_SIZE; i++) {
     GridNodeMap[i] = new GridNodePtr *[GLY_SIZE];
+    EDT[i] = new double *[GLY_SIZE];
     for (int j = 0; j < GLY_SIZE; j++) {
       GridNodeMap[i][j] = new GridNodePtr[GLZ_SIZE];
+      EDT[i][j] = new double [GLZ_SIZE];
       for (int k = 0; k < GLZ_SIZE; k++) {
+        EDT[i][j][k] = max_dist;
         Vector3i tmpIdx(i, j, k);
         Vector3d pos = gridIndex2coord(tmpIdx);
         GridNodeMap[i][j][k] = new GridNode(tmpIdx, pos);
@@ -63,21 +68,160 @@ void AstarPathFinder::setObs(const double coord_x, const double coord_y,
   int idx_x = static_cast<int>((coord_x - gl_xl) * inv_resolution);
   int idx_y = static_cast<int>((coord_y - gl_yl) * inv_resolution);
   int idx_z = static_cast<int>((coord_z - gl_zl) * inv_resolution);
+  vector<Vector3i> new_voxel;
 
   if (idx_x == 0 || idx_y == 0 || idx_z == GLZ_SIZE || idx_x == GLX_SIZE ||
       idx_y == GLY_SIZE)
-    data[idx_x * GLYZ_SIZE + idx_y * GLZ_SIZE + idx_z] = 1;
+    if (data[idx_x * GLYZ_SIZE + idx_y * GLZ_SIZE + idx_z] == 0){
+      new_voxel.push_back(Vector3i(idx_x, idx_y, idx_z));
+      data[idx_x * GLYZ_SIZE + idx_y * GLZ_SIZE + idx_z] = 1;
+    }
   else {
-    data[idx_x * GLYZ_SIZE + idx_y * GLZ_SIZE + idx_z] = 1;
-    data[(idx_x + 1) * GLYZ_SIZE + (idx_y + 1) * GLZ_SIZE + idx_z] = 1;
-    data[(idx_x + 1) * GLYZ_SIZE + (idx_y - 1) * GLZ_SIZE + idx_z] = 1;
-    data[(idx_x - 1) * GLYZ_SIZE + (idx_y + 1) * GLZ_SIZE + idx_z] = 1;
-    data[(idx_x - 1) * GLYZ_SIZE + (idx_y - 1) * GLZ_SIZE + idx_z] = 1;
-    data[(idx_x)*GLYZ_SIZE + (idx_y + 1) * GLZ_SIZE + idx_z] = 1;
-    data[(idx_x)*GLYZ_SIZE + (idx_y - 1) * GLZ_SIZE + idx_z] = 1;
-    data[(idx_x + 1) * GLYZ_SIZE + (idx_y)*GLZ_SIZE + idx_z] = 1;
-    data[(idx_x - 1) * GLYZ_SIZE + (idx_y)*GLZ_SIZE + idx_z] = 1;
+    if (data[idx_x * GLYZ_SIZE + idx_y * GLZ_SIZE + idx_z] == 0){
+      new_voxel.push_back(Vector3i(idx_x, idx_y, idx_z));
+      data[idx_x * GLYZ_SIZE + idx_y * GLZ_SIZE + idx_z] = 1;
+    }
+    if (data[(idx_x + 1) * GLYZ_SIZE + (idx_y + 1) * GLZ_SIZE + idx_z] == 0){
+      new_voxel.push_back(Vector3i(idx_x, idx_y, idx_z));
+      data[(idx_x + 1) * GLYZ_SIZE + (idx_y + 1) * GLZ_SIZE + idx_z] = 1;
+    }
+    if (data[(idx_x + 1) * GLYZ_SIZE + (idx_y - 1) * GLZ_SIZE + idx_z] == 0){
+      new_voxel.push_back(Vector3i(idx_x, idx_y, idx_z));
+      data[(idx_x + 1) * GLYZ_SIZE + (idx_y - 1) * GLZ_SIZE + idx_z] = 1;
+    }
+    if (data[(idx_x - 1) * GLYZ_SIZE + (idx_y + 1) * GLZ_SIZE + idx_z] == 0){
+      new_voxel.push_back(Vector3i(idx_x, idx_y, idx_z));
+      data[(idx_x - 1) * GLYZ_SIZE + (idx_y + 1) * GLZ_SIZE + idx_z] = 1;
+    }
+    if (data[(idx_x - 1) * GLYZ_SIZE + (idx_y - 1) * GLZ_SIZE + idx_z] == 0){
+      new_voxel.push_back(Vector3i(idx_x, idx_y, idx_z));
+      data[(idx_x - 1) * GLYZ_SIZE + (idx_y - 1) * GLZ_SIZE + idx_z] = 1;
+    }
+    if (data[(idx_x)*GLYZ_SIZE + (idx_y + 1) * GLZ_SIZE + idx_z] == 0){
+      new_voxel.push_back(Vector3i(idx_x, idx_y, idx_z));
+      data[(idx_x)*GLYZ_SIZE + (idx_y + 1) * GLZ_SIZE + idx_z] = 1;
+    }
+    if (data[(idx_x)*GLYZ_SIZE + (idx_y - 1) * GLZ_SIZE + idx_z] == 0){
+      new_voxel.push_back(Vector3i(idx_x, idx_y, idx_z));
+      data[(idx_x)*GLYZ_SIZE + (idx_y - 1) * GLZ_SIZE + idx_z] = 1;
+    }
+    if (data[(idx_x + 1) * GLYZ_SIZE + (idx_y)*GLZ_SIZE + idx_z] == 0){
+      new_voxel.push_back(Vector3i(idx_x, idx_y, idx_z));
+      data[(idx_x + 1) * GLYZ_SIZE + (idx_y)*GLZ_SIZE + idx_z] = 1;
+    }
+    if (data[(idx_x - 1) * GLYZ_SIZE + (idx_y)*GLZ_SIZE + idx_z] == 0){
+      new_voxel.push_back(Vector3i(idx_x, idx_y, idx_z));
+      data[(idx_x - 1) * GLYZ_SIZE + (idx_y)*GLZ_SIZE + idx_z] = 1;
+    }
   }
+  updateEDT(new_voxel);
+}
+
+void AstarPathFinder::updateEDT(vector<Vector3i> new_voxel)
+{
+  while (!new_voxel.empty())
+  {
+    Vector3i pt = new_voxel.back();
+    EDT[pt(0)*GLYZ_SIZE][pt(1)*GLZ_SIZE][pt(2)] = -getMinDist(pt);
+    new_voxel.pop_back();
+    vector<Vector3i> pt_succ;
+    VoxelGetSucc(pt, pt_succ);
+    
+    vector<Vector3i> openSetFree;
+    vector<Vector3i> openSetOccupy;
+    openSetOccupy.push_back(pt);
+    while (!pt_succ.empty())
+    {
+      Vector3i temp_pt = pt_succ.back();
+      pt_succ.pop_back();
+      if (isFree(temp_pt)) openSetFree.push_back(temp_pt);
+    }
+    while (!openSetFree.empty())
+    {
+      Vector3i cur_pt = openSetFree.back();
+      openSetFree.pop_back();
+      if ((cur_pt-pt).norm()<EDT[cur_pt(0)*GLYZ_SIZE][cur_pt(1)*GLZ_SIZE][cur_pt(2)])
+      {
+        EDT[cur_pt(0)*GLYZ_SIZE][cur_pt(1)*GLZ_SIZE][cur_pt(2)] = (cur_pt-pt).norm();
+        pt_succ.clear();
+        VoxelGetSucc(cur_pt, pt_succ);
+        while (!pt_succ.empty())
+        {
+          Vector3i temp_pt = pt_succ.back();
+          pt_succ.pop_back();
+          if (isFree(temp_pt)) openSetFree.push_back(temp_pt);
+        }
+      }
+    }
+    while (!openSetOccupy.empty())
+    {
+      Vector3i cur_pt = openSetFree.back();
+      openSetOccupy.pop_back();
+      pt_succ.clear();
+      VoxelGetSucc(cur_pt, pt_succ);
+      while (!pt_succ.empty())
+      {
+        Vector3i temp_pt = pt_succ.back();
+        pt_succ.pop_back();
+        if (isOccupied(temp_pt))
+        {
+          double min_dist = getMinDist(temp_pt);
+          if (min_dist > -EDT[temp_pt(0)*GLYZ_SIZE][temp_pt(1)*GLZ_SIZE][temp_pt(2)])
+          {
+            EDT[temp_pt(0)*GLYZ_SIZE][temp_pt(1)*GLZ_SIZE][temp_pt(2)] = -min_dist;
+            openSetOccupy.push_back(temp_pt);
+          }
+        }
+      }
+    }
+  }
+
+}
+
+double AstarPathFinder::getMinDist(Eigen::Vector3i & index)
+{
+  if (isFree(index)) return 0.0;
+  double temp_min_dist = max_dist;
+  vector<Vector3i> occupySet;
+  vector<Vector3i> succSet;
+  VoxelGetSucc(index, succSet);
+  while (!succSet.empty())
+  {
+    Vector3i temp_pt = succSet.back();
+    succSet.pop_back();
+    if (isOccupied(temp_pt))
+    {
+      occupySet.push_back(temp_pt);
+    }
+    else
+    {
+      temp_min_dist = (temp_pt-index).norm();
+    }
+  }
+  while (!occupySet.empty())
+  {
+    succSet.clear();
+    Vector3i this_pt = occupySet.back();
+    occupySet.pop_back();
+    if ((this_pt-index).norm()>=temp_min_dist)
+      continue;
+    VoxelGetSucc(this_pt, succSet);
+    while(!succSet.empty())
+    {
+      Vector3i temp_pt = succSet.back();
+      succSet.pop_back();
+      if (isOccupied(temp_pt))
+      {
+        occupySet.push_back(temp_pt);
+      }
+      else
+      {
+        if ((temp_pt-index).norm()<temp_min_dist)
+          temp_min_dist = (temp_pt-index).norm();
+      }
+    }
+  }
+  return temp_min_dist;
 }
 
 vector<Vector3d> AstarPathFinder::getVisitedNodes() {
@@ -167,6 +311,32 @@ inline void AstarPathFinder::AstarGetSucc(GridNodePtr currentPtr,
         neighborPtrSets.push_back(
             GridNodeMap[neighborIdx(0)][neighborIdx(1)][neighborIdx(2)]);
         edgeCostSets.push_back(sqrt(dx * dx + dy * dy + dz * dz));
+      }
+    }
+  }
+}
+
+inline void AstarPathFinder::VoxelGetSucc(Vector3i currentPt, std::vector<Vector3i> & neighborSets)
+{
+  neighborSets.clear();
+  for (int dx = -1; dx < 2; dx++) {
+    for (int dy = -1; dy < 2; dy++) {
+      for (int dz = -1; dz < 2; dz++) {
+
+        if (dx == 0 && dy == 0 && dz == 0)
+          continue;
+        Vector3i neighborIdx;
+        neighborIdx(0) = currentPt(0) + dx;
+        neighborIdx(1) = currentPt(1) + dy;
+        neighborIdx(2) = currentPt(2) + dz;
+
+        if (neighborIdx(0) < 0 || neighborIdx(0) >= GLX_SIZE ||
+            neighborIdx(1) < 0 || neighborIdx(1) >= GLY_SIZE ||
+            neighborIdx(2) < 0 || neighborIdx(2) >= GLZ_SIZE) {
+          continue;
+        }
+
+        neighborSets.push_back(neighborIdx);
       }
     }
   }
