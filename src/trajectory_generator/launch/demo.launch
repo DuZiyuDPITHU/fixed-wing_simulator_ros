@@ -1,15 +1,15 @@
 <launch>
 
-<arg name="map_size_x" default="30.0"/>
-<arg name="map_size_y" default="30.0"/>
-<arg name="map_size_z" default="4.0"/>
+<arg name="map_size_x" default="200.0"/>
+<arg name="map_size_y" default="200.0"/>
+<arg name="map_size_z" default="10.0"/>
 <arg name="map_frame_name"  default="world"/>
 
 <arg name="start_x" default=" -15.0"/>
 <arg name="start_y" default=" 0.0"/>
-<arg name="start_z" default=" 2.0"/>
+<arg name="start_z" default=" 8.0"/>
 
-<arg name="sensing_horizon"  default="5.0" />
+<arg name="sensing_horizon"  default="30.0" />
 <arg name="sensing_rate"     default="30.0"/>
 <arg name="estimation_rate"  default="30.0"/>
 
@@ -23,9 +23,9 @@
       <param name="planning/acc"                value="2.0"  />
       <param name="planning/dev_order"          value="4"    />
       <param name="planning/min_order"          value="3"    />
-      <param name="vis/vis_traj_width"          value="0.07" />
+      <param name="vis/vis_traj_width"          value="0.7" />
       <param name="map/margin"                  value="0.0" />
-      <param name="map/resolution"              value="0.2" />
+      <param name="map/resolution"              value="1.0" />
       <param name="map/x_size"                  value="$(arg map_size_x)"/>
       <param name="map/y_size"                  value="$(arg map_size_y)"/>
       <param name="map/z_size"                  value="$(arg map_size_z)"/>
@@ -39,11 +39,14 @@
       <param name="optimization/lambda_curvature" value="0.1" type="double"/>
       <param name="optimization/lambda_fitness" value="1.0" type="double"/>
       <param name="optimization/dist0" value="0.5" type="double"/>
-      <param name="optimization/max_vel" value="5.0" type="double"/>
+      <param name="optimization/max_vel" value="10.0" type="double"/>
       <param name="optimization/min_vel" value="1.0" type="double"/>
-      <param name="optimization/max_acc" value="1.0" type="double"/>
+      <param name="optimization/max_acc" value="5.0" type="double"/>
       <param name="optimization/order_" value="3" type="int"/>
       <param name="optimization/control_points_distance" value="1.0" type="double"/>
+
+      <param name="hovering_speed" value="3.0" type="double"/>
+      <param name="hovering_radius" value="6.0" type="double"/>
 
   </node>
 
@@ -66,11 +69,11 @@
     <param name="map_frame_name"      value="$(arg map_frame_name)"/>
 
     <param name="map/circle_num" value="0"/>        
-    <param name="map/obs_num"    value="150"/>        
-    <param name="map/resolution" value="0.1"/>     
+    <param name="map/obs_num"    value="50"/>        
+    <param name="map/resolution" value="0.3"/>     
 
-    <param name="ObstacleShape/lower_rad" value="0.1"/>
-    <param name="ObstacleShape/upper_rad" value="0.7"/>
+    <param name="ObstacleShape/lower_rad" value="4"/>
+    <param name="ObstacleShape/upper_rad" value="10"/>
     <param name="ObstacleShape/lower_hei" value="1.0"/>
     <param name="ObstacleShape/upper_hei" value="2.5"/>
     <param name="CircleShape/lower_circle_rad"   value="0.6"/>        

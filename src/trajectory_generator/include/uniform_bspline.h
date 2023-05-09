@@ -20,6 +20,7 @@ private:
   Eigen::MatrixXd control_points_;
 
   int p_, n_, m_;     // p degree, n+1 control points, m = n+p+1
+  bool flag;
   Eigen::VectorXd u_; // knots vector
   double interval_;   // knot span \delta t
 
@@ -28,7 +29,7 @@ private:
   double limit_vel_, limit_acc_, limit_ratio_, feasibility_tolerance_; // physical limits and time adjustment ratio
 
 public:
-  UniformBspline() {}
+  UniformBspline() {flag = false;}
   UniformBspline(const Eigen::MatrixXd &points, const int &order, const double &interval);
   ~UniformBspline();
 
@@ -41,6 +42,7 @@ public:
 
   void setKnot(const Eigen::VectorXd &knot);
   Eigen::VectorXd getKnot();
+  bool getFlag() {return flag;}
   Eigen::MatrixXd getControlPoint();
   double getInterval();
   bool getTimeSpan(double &um, double &um_p);
@@ -96,7 +98,7 @@ public:
     BsplineOpt() {printf("initializing bspline optimizer\n");};
     ~BsplineOpt() {};
     void set_param(ros::NodeHandle* nh);
-    void set_bspline(std::vector<Eigen::Vector3d> cps);
+    void set_bspline(std::vector<Eigen::Vector3d> A_Star_Path, std::vector<Eigen::Vector3d> start_target_derivetive);
     UniformBspline get_bspline();
 };
 #endif

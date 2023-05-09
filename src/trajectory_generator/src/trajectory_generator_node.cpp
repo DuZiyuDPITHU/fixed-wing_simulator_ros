@@ -42,9 +42,11 @@ int _max_x_id, _max_y_id, _max_z_id;
 double _vis_traj_width;
 double _Vel, _Acc;
 int _dev_order, _min_order;
+double hovering_speed, hovering_radius;
 
 ////////////////////////
 int num_cp;
+double dPI = 3.1415926535897;
 ros::NodeHandle* nh_ptr;
 ////////////////////////
 
@@ -59,11 +61,15 @@ int _poly_num1D;
 MatrixXd _polyCoeff;
 VectorXd _polyTime;
 double time_duration;
+double time_duration_default;
 ros::Time time_traj_start;
 bool has_odom = false;
 bool has_target = false;
 UniformBspline cur_bspline_traj;
 UniformBspline cur_bspline_vel;
+UniformBspline default_traj;
+int hovering_pub_count = 0;
+ros::Time time_hovering_start;
 
 // for replanning
 enum STATE {
@@ -87,7 +93,10 @@ void rcvOdomCallback(const nav_msgs::Odometry::ConstPtr &odom);
 void rcvWaypointsCallback(const nav_msgs::Path &wp);
 void rcvPointCloudCallBack(const sensor_msgs::PointCloud2 &pointcloud_map);
 void trajPublish(MatrixXd polyCoeff, VectorXd time);
+void bspline_traj_pub(UniformBspline* uniform_bspline_ptr);
 bool trajGeneration();
+bool defaultTrajGeneration();
+Vector3d zRotate(Vector3d origin_vec, double angle);
 VectorXd timeAllocation(MatrixXd Path);
 Vector3d getPos(double t_cur);
 Vector3d getVel(double t_cur);
@@ -146,7 +155,24 @@ void execCallback(const ros::TimerEvent &e) {
 
   case WAIT_TARGET: {
     if (!has_target)
-      return;
+    {
+      if (!default_traj.getFlag())
+        return;
+      if (hovering_pub_count==0)
+      {
+        time_hovering_start = ros::Time::now();
+        bspline_traj_pub(&default_traj);
+        hovering_pub_count++;
+        return;
+      }
+      else
+      {
+        ros::Time time_now = ros::Time::now();
+        double t_cur = (time_now - time_hovering_start).toSec();
+        if (t_cur > time_duration_default - 1e-6)
+          hovering_pub_count = 0;
+      }
+    }
     else
       changeState(GEN_NEW_TRAJ, "STATE");
     break;
@@ -167,7 +193,7 @@ void execCallback(const ros::TimerEvent &e) {
     double t_replan = ros::Duration(2, 0).toSec();
     t_cur = min(time_duration, t_cur);
 
-    if (t_cur > time_duration - 1e-2) {
+    if (t_cur > time_duration - 5e-1) {
       has_target = false;
       changeState(WAIT_TARGET, "STATE");
       return;
@@ -186,7 +212,7 @@ void execCallback(const ros::TimerEvent &e) {
   case REPLAN_TRAJ: {
     ros::Time time_now = ros::Time::now();
     double t_cur = (time_now - time_traj_start).toSec();
-    double t_delta = ros::Duration(0, 10).toSec();
+    double t_delta = ros::Duration(0, 0).toSec();
     t_cur = t_delta + t_cur;
     //start_pt = getPos(t_cur);
     //start_vel = getVel(t_cur);
@@ -286,7 +312,14 @@ bool trajGeneration() {
   auto grid_path = _astar_path_finder->getPath();
   BsplineOpt bspline_opt;
   bspline_opt.set_param(nh_ptr);
-  bspline_opt.set_bspline(grid_path);
+  vector<Vector3d> start_target_derivative;
+
+  start_target_derivative.push_back(start_vel);
+  start_target_derivative.push_back((grid_path[0]-grid_path[1]).normalized()*hovering_speed);
+  start_target_derivative.push_back(Vector3d(0, 0, 0));
+  start_target_derivative.push_back(Vector3d(0, 0, 0));
+
+  bspline_opt.set_bspline(grid_path, start_target_derivative);
   UniformBspline bspline(bspline_opt.get_bspline());
   //std::cout<<bspline.get_control_points()<<std::endl;
   time_traj_start = ros::Time::now();
@@ -295,6 +328,9 @@ bool trajGeneration() {
 
   cur_bspline_traj = bspline;
   cur_bspline_vel = cur_bspline_traj.getDerivative();
+  if (cur_bspline_traj.get_control_points().cols() > 2)
+    defaultTrajGeneration();
+    time_duration_default = default_traj.getTimeSum();
   
   printf("Get A* path\n");
   // Reset map for next call
@@ -330,6 +366,41 @@ bool trajGeneration() {
   else
     return false;
     */
+}
+
+bool defaultTrajGeneration()
+{
+  MatrixXd cur_control_pt = cur_bspline_traj.getControlPoint();
+  if (cur_control_pt.cols()<3)
+    return false;
+  Vector3d p0 = (cur_control_pt.col(cur_control_pt.cols()-3) - cur_control_pt.col(cur_control_pt.cols()-2)).normalized();
+  Vector3d hovering_center = target_pt + hovering_radius*zRotate((cur_control_pt.col(cur_control_pt.cols()-3) - cur_control_pt.col(cur_control_pt.cols()-2)).normalized(), dPI/2);
+  vector<Vector3d> points;
+  double rotate_angles[7] = //{-2*dPI/3, dPI, 2*dPI/3, dPI/3, 0, -dPI/3, -2*dPI/3};
+  {-dPI/2, -5*dPI/6, 5*dPI/6, dPI/2, dPI/6, -dPI/6, -dPI/2};
+  //points.push_back(cur_control_pt.col(cur_control_pt.cols()-1));
+  for (int i=0;i<7;i++)
+  {
+    points.push_back(hovering_center+hovering_radius * zRotate(p0, rotate_angles[i]));
+  }
+  vector<Vector3d> start_target_derivative;
+  start_target_derivative.push_back(-p0*hovering_speed);
+  start_target_derivative.push_back(-1.5*p0*hovering_speed);
+  start_target_derivative.push_back(Vector3d(0,0,0));
+  start_target_derivative.push_back(Vector3d(0,0,0));
+  MatrixXd control_pt;
+  default_traj.parameterizeToBspline(hovering_radius/hovering_speed, points, start_target_derivative, control_pt);
+  default_traj.setUniformBspline(control_pt, 3, 0.8*hovering_radius/hovering_speed);
+  return true;
+}
+
+Vector3d zRotate(Vector3d origin_vec, double angle)
+{
+  Matrix3d rot_mat;
+  rot_mat <<  cos(angle), sin(angle), 0,
+              -sin(angle),cos(angle), 0,
+              0         , 0         , 1;
+  return rot_mat*origin_vec;
 }
 
 void trajOptimization(Eigen::MatrixXd path) {
@@ -559,6 +630,8 @@ int main(int argc, char **argv) {
   nh.param("path/resolution", _path_resolution, 0.05);
   nh.param("replanning/thresh_replan", replan_thresh, -1.0);
   nh.param("replanning/thresh_no_replan", no_replan_thresh, -1.0);
+  nh.param("hovering_speed", hovering_speed, 3.0);
+  nh.param("hovering_radius", hovering_radius, 3.0);
   num_cp = 40;
 
   _poly_num1D = 2 * _dev_order;
@@ -566,7 +639,7 @@ int main(int argc, char **argv) {
   _exec_timer = nh.createTimer(ros::Duration(0.01), execCallback);
 
   _odom_sub = nh.subscribe("odom", 10, rcvOdomCallback);
-  _map_sub = nh.subscribe("local_pointcloud", 1, rcvPointCloudCallBack);
+  _map_sub = nh.subscribe("/pcl_render_node/local_pointcloud", 1, rcvPointCloudCallBack);
   _pts_sub = nh.subscribe("waypoints", 1, rcvWaypointsCallBack);
 
   _traj_pub =

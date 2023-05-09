@@ -12,6 +12,7 @@ UniformBspline::~UniformBspline() {}
 void UniformBspline::setUniformBspline(const Eigen::MatrixXd &points, const int &order,
                                         const double &interval)
 {
+  flag = true;
   control_points_ = points;
   p_ = order;
   interval_ = interval;
@@ -390,7 +391,7 @@ void BsplineOpt::set_param(ros::NodeHandle* nh)
   nh->param("optimization/control_points_distance", cp_dist_, 5.0);
 }
 
-void BsplineOpt::set_bspline(std::vector<Eigen::Vector3d> A_Star_Path)
+void BsplineOpt::set_bspline(std::vector<Eigen::Vector3d> A_Star_Path, std::vector<Eigen::Vector3d> start_target_derivative)
 {
   //printf("setting bspline\n");
   start_pt_ = A_Star_Path.front();
@@ -398,7 +399,19 @@ void BsplineOpt::set_bspline(std::vector<Eigen::Vector3d> A_Star_Path)
   double dist_count = 0;
   //Eigen::MatrixXd points = start_pt_;
   std::vector<Eigen::Vector3d> points;
+  Eigen::Vector3d fore_point;
+  for (int i=1; i<A_Star_Path.size(); i++)
+  {
+    dist_count += (A_Star_Path[i] - A_Star_Path[i-1]).norm();
+    if (dist_count > cp_dist_)
+    {
+      fore_point = start_pt_ - (A_Star_Path[i]-start_pt_);
+      break;
+    }
+  }
+  points.push_back(fore_point);
   points.push_back(start_pt_);
+  
   for (int i=1; i<A_Star_Path.size(); i++)
   {
     dist_count += (A_Star_Path[i] - A_Star_Path[i-1]).norm();
@@ -415,17 +428,23 @@ void BsplineOpt::set_bspline(std::vector<Eigen::Vector3d> A_Star_Path)
   //printf("setting control points\n");
   Eigen::MatrixXd control_points(int(points.size()), 3);
   int count = 0;
+  vector<Eigen::Vector3d> points_inv;
   for (int i=points.size()-1; i>=0; i--)
   {
+    /*
     for (int j=0;j<order_;j++)
     {
       //control_points.row(i) << points[i];
       control_points(count, j) = double(points[i](j));
-    }
+    }*/
+    points_inv.push_back(points[i]);
     count ++;
   }
+  //cout<<control_points.transpose() << endl;
   double ts = cp_dist_ / max_vel_ * 5;
-  bspline = UniformBspline(control_points.transpose(), order_, ts);
+  bspline.parameterizeToBspline(ts,points_inv, start_target_derivative, control_points);
+  bspline = UniformBspline(control_points, order_, ts);
+  printf("gen\n");
 }
 
 UniformBspline BsplineOpt::get_bspline()

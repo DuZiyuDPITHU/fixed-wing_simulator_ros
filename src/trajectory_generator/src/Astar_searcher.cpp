@@ -28,7 +28,7 @@ void AstarPathFinder::initGridMap(double _resolution, Vector3d global_xyz_l,
 
   resolution = _resolution;
   inv_resolution = 1.0 / _resolution;
-
+  printf("map info: gl_xl %f, gl_yl %f, gl_zl %f RESOLUTION %f\n", gl_xl, gl_yl, gl_zl, resolution);
   data = new uint8_t[GLXYZ_SIZE];
   flag = new uint8_t[GLXYZ_SIZE];
   EDT = new double[GLXYZ_SIZE];
@@ -37,7 +37,11 @@ void AstarPathFinder::initGridMap(double _resolution, Vector3d global_xyz_l,
     EDT[i] = max_dist;
   }
   memset(flag, 0, GLXYZ_SIZE * sizeof(uint8_t));
-  memset(data, 0, GLXYZ_SIZE * sizeof(uint8_t));
+  //memset(data, 0, GLXYZ_SIZE * sizeof(uint8_t));
+  for (int i=0;i<GLXYZ_SIZE;i++)
+  {
+    data[i] = 0;
+  }
 
   GridNodeMap = new GridNodePtr **[GLX_SIZE];
   for (int i = 0; i < GLX_SIZE; i++) {
@@ -72,57 +76,73 @@ void AstarPathFinder::setObs(const double coord_x, const double coord_y,
   //printf("setting obs\n");
   if (coord_x < gl_xl || coord_y < gl_yl || coord_z < gl_zl ||
       coord_x >= gl_xu || coord_y >= gl_yu || coord_z >= gl_zu)
-    return;
-
+    {/*printf("a%f, %f, %f\n%f, %f, %f\n%f, %f, %f\n", gl_xl, gl_yl, gl_zl, gl_xu, gl_yu, gl_zu, coord_x, coord_y, coord_z);*/ return;}
+  //printf("%f, %f, %f\n", coord_x, coord_y, coord_z);
   int idx_x = static_cast<int>((coord_x - gl_xl) * inv_resolution);
   int idx_y = static_cast<int>((coord_y - gl_yl) * inv_resolution);
   int idx_z = static_cast<int>((coord_z - gl_zl) * inv_resolution);
   vector<Vector3i> new_voxel;
-
+  //printf("setting voxel: %d, %d, %d\n", idx_x, idx_y, idx_z);
+  int count  = 0;
+  //std::printf("%d\n", data[idx_x * GLYZ_SIZE + idx_y * GLZ_SIZE + idx_z] == uint8_t(0));
   if (idx_x == 0 || idx_y == 0 || idx_z == GLZ_SIZE || idx_x == GLX_SIZE ||
       idx_y == GLY_SIZE)
-    if (data[idx_x * GLYZ_SIZE + idx_y * GLZ_SIZE + idx_z] == 0){
+  {
+    if (data[idx_x * GLYZ_SIZE + idx_y * GLZ_SIZE + idx_z] == uint8_t(0)){
       new_voxel.push_back(Vector3i(idx_x, idx_y, idx_z));
       data[idx_x * GLYZ_SIZE + idx_y * GLZ_SIZE + idx_z] = 1;
+      count ++;
     }
+  }
   else {
-    if (data[idx_x * GLYZ_SIZE + idx_y * GLZ_SIZE + idx_z] == 0){
+    if (data[idx_x * GLYZ_SIZE + idx_y * GLZ_SIZE + idx_z] == uint8_t(0)){
+      printf("a\n");
       new_voxel.push_back(Vector3i(idx_x, idx_y, idx_z));
       data[idx_x * GLYZ_SIZE + idx_y * GLZ_SIZE + idx_z] = 1;
+      count ++;
     }
     if (data[(idx_x + 1) * GLYZ_SIZE + (idx_y + 1) * GLZ_SIZE + idx_z] == 0){
       new_voxel.push_back(Vector3i(idx_x, idx_y, idx_z));
       data[(idx_x + 1) * GLYZ_SIZE + (idx_y + 1) * GLZ_SIZE + idx_z] = 1;
+      count ++;
     }
     if (data[(idx_x + 1) * GLYZ_SIZE + (idx_y - 1) * GLZ_SIZE + idx_z] == 0){
       new_voxel.push_back(Vector3i(idx_x, idx_y, idx_z));
       data[(idx_x + 1) * GLYZ_SIZE + (idx_y - 1) * GLZ_SIZE + idx_z] = 1;
+      count ++;
     }
     if (data[(idx_x - 1) * GLYZ_SIZE + (idx_y + 1) * GLZ_SIZE + idx_z] == 0){
       new_voxel.push_back(Vector3i(idx_x, idx_y, idx_z));
       data[(idx_x - 1) * GLYZ_SIZE + (idx_y + 1) * GLZ_SIZE + idx_z] = 1;
+      count ++;
     }
     if (data[(idx_x - 1) * GLYZ_SIZE + (idx_y - 1) * GLZ_SIZE + idx_z] == 0){
       new_voxel.push_back(Vector3i(idx_x, idx_y, idx_z));
       data[(idx_x - 1) * GLYZ_SIZE + (idx_y - 1) * GLZ_SIZE + idx_z] = 1;
+      count ++;
     }
     if (data[(idx_x)*GLYZ_SIZE + (idx_y + 1) * GLZ_SIZE + idx_z] == 0){
       new_voxel.push_back(Vector3i(idx_x, idx_y, idx_z));
       data[(idx_x)*GLYZ_SIZE + (idx_y + 1) * GLZ_SIZE + idx_z] = 1;
+      count ++;
     }
     if (data[(idx_x)*GLYZ_SIZE + (idx_y - 1) * GLZ_SIZE + idx_z] == 0){
       new_voxel.push_back(Vector3i(idx_x, idx_y, idx_z));
       data[(idx_x)*GLYZ_SIZE + (idx_y - 1) * GLZ_SIZE + idx_z] = 1;
+      count ++;
     }
     if (data[(idx_x + 1) * GLYZ_SIZE + (idx_y)*GLZ_SIZE + idx_z] == 0){
       new_voxel.push_back(Vector3i(idx_x, idx_y, idx_z));
       data[(idx_x + 1) * GLYZ_SIZE + (idx_y)*GLZ_SIZE + idx_z] = 1;
+      count ++;
     }
     if (data[(idx_x - 1) * GLYZ_SIZE + (idx_y)*GLZ_SIZE + idx_z] == 0){
       new_voxel.push_back(Vector3i(idx_x, idx_y, idx_z));
       data[(idx_x - 1) * GLYZ_SIZE + (idx_y)*GLZ_SIZE + idx_z] = 1;
+      count ++;
     }
   }
+  //std::printf("%d\n", data[idx_x * GLYZ_SIZE + idx_y * GLZ_SIZE + idx_z]);
   updateEDT(new_voxel);
 }
 
@@ -164,7 +184,7 @@ void AstarPathFinder::updateEDT(vector<Vector3i> new_voxel)
         }
       }
     }
-    std::printf("updated free space\n");
+    //std::printf("updated free space\n");
     while (!openSetOccupy.empty())
     {
       Vector3i cur_pt = openSetOccupy.back();
@@ -189,7 +209,7 @@ void AstarPathFinder::updateEDT(vector<Vector3i> new_voxel)
         }
       }
     }
-    std::printf("updated occupied space\n");
+    //std::printf("updated occupied space\n");
   }
 
 }
@@ -498,6 +518,7 @@ void AstarPathFinder::AstarGraphSearch(Vector3d start_pt, Vector3d end_pt) {
       {
         GridNodePtr succPtr = neighborPtrSets.back();
         neighborPtrSets.pop_back();
+        if (isOccupied(succPtr->index)) continue;
         double succCost = edgeCostSets.back();
         edgeCostSets.pop_back();
         if (this->isOccupied(succPtr->index) || succPtr->id == -1)
