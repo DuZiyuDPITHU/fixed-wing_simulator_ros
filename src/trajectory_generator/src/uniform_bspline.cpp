@@ -1,4 +1,5 @@
 #include "uniform_bspline.h"
+#include "lbfgs.hpp"
 #include <ros/ros.h>
 
 UniformBspline::UniformBspline(const Eigen::MatrixXd &points, const int &order,
@@ -374,7 +375,7 @@ void UniformBspline::getMeanAndMaxAcc(double &mean_a, double &max_a)
   max_a = max_acc;
 }
 
-void BsplineOpt::set_param(ros::NodeHandle* nh)
+void BsplineOpt::set_param(ros::NodeHandle* nh, AstarPathFinder* new_path_finder)
 {
   printf("setting bspline param\n");
   nh->param("optimization/lambda_smooth", lambda1_, -1.0);
@@ -389,6 +390,7 @@ void BsplineOpt::set_param(ros::NodeHandle* nh)
   nh->param("optimization/min_vel", min_vel, -1.0);
   nh->param("optimization/order_", order_, 3);
   nh->param("optimization/control_points_distance", cp_dist_, 5.0);
+  path_finder = new_path_finder;
 }
 
 void BsplineOpt::set_bspline(std::vector<Eigen::Vector3d> A_Star_Path, std::vector<Eigen::Vector3d> start_target_derivative)
@@ -450,4 +452,150 @@ void BsplineOpt::set_bspline(std::vector<Eigen::Vector3d> A_Star_Path, std::vect
 UniformBspline BsplineOpt::get_bspline()
 {
   return this->bspline;
+}
+
+void BsplineOpt::calcSmoothnessCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient)
+{
+  cost = 0.0;
+  Eigen::Vector3d acc, temp_acc;
+
+  for (int i = 0; i < q.cols() - 2; i++)
+  {
+    /* evaluate acc */
+    acc = q.col(i + 2) - 2 * q.col(i + 1) + q.col(i);
+    cost += acc.squaredNorm();
+    temp_acc = 2.0 * acc;
+    /* acc gradient */
+    gradient.col(i + 0) += temp_acc;
+    gradient.col(i + 1) += -2.0 * temp_acc;
+    gradient.col(i + 2) += temp_acc;
+  }
+}
+
+void BsplineOpt::calcFeasibilityCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient)
+{
+  cost = 0.0;
+  double ts, ts_inv2;
+  ts = bspline.getInterval();
+  ts_inv2 = 1 / ts / ts;
+
+  /* velocity feasibility */
+  for (int i = 0; i < q.cols() - 1; i++)
+  {
+    Eigen::Vector3d vi = (q.col(i + 1) - q.col(i)) / ts;
+    for (int j = 0; j < 3; j++)
+    {
+      if (vi(j) > max_vel_)
+      {
+        cost += pow(vi(j) - max_vel_, 2) * ts_inv2; // multiply ts_inv3 to make vel and acc has similar magnitude
+
+        gradient(j, i + 0) += -2 * (vi(j) - max_vel_) / ts * ts_inv2;
+        gradient(j, i + 1) += 2 * (vi(j) - max_vel_) / ts * ts_inv2;
+      }
+      else if (vi(j) < -max_vel_)
+      {
+        cost += pow(vi(j) + max_vel_, 2) * ts_inv2;
+
+        gradient(j, i + 0) += -2 * (vi(j) + max_vel_) / ts * ts_inv2;
+        gradient(j, i + 1) += 2 * (vi(j) + max_vel_) / ts * ts_inv2;
+      }
+      else if (vi(j) < min_vel_ && vi(j) > -min_vel_)
+      {
+        if (vi(j) < min_vel_ && vi(j) >= 0)
+        {
+          cost += pow(vi(j) - min_vel_, 2) * ts_inv2;
+
+          gradient(j, i + 0) += -2 * (min_vel_ - vi(j)) / ts * ts_inv2;
+          gradient(j, i + 1) += 2 * (min_vel_ - vi(j)) / ts * ts_inv2;
+        }
+        else
+        {
+          cost += pow(vi(j) + min_vel_, 2) * ts_inv2;
+
+          gradient(j, i + 0) += 2 * (min_vel_ + vi(j)) / ts * ts_inv2;
+          gradient(j, i + 1) += -2 * (min_vel_ + vi(j)) / ts * ts_inv2;
+        }
+      }
+    }
+  }
+  /* acceleration feasibility */
+  for (int i = 0; i < q.cols() - 2; i++)
+  {
+    Eigen::Vector3d ai = (q.col(i + 2) - 2 * q.col(i + 1) + q.col(i)) * ts_inv2;
+
+    //cout << "temp_a * ai=" ;
+    for (int j = 0; j < 3; j++)
+    {
+      if (ai(j) > max_acc_)
+      {
+        // cout << "fuck ACC" << endl;
+        // cout << ai(j) << endl;
+        cost += pow(ai(j) - max_acc_, 2);
+
+        gradient(j, i + 0) += 2 * (ai(j) - max_acc_) * ts_inv2;
+        gradient(j, i + 1) += -4 * (ai(j) - max_acc_) * ts_inv2;
+        gradient(j, i + 2) += 2 * (ai(j) - max_acc_) * ts_inv2;
+      }
+      else if (ai(j) < -max_acc_)
+      {
+        cost += pow(ai(j) + max_acc_, 2);
+
+        gradient(j, i + 0) += 2 * (ai(j) + max_acc_) * ts_inv2;
+        gradient(j, i + 1) += -4 * (ai(j) + max_acc_) * ts_inv2;
+        gradient(j, i + 2) += 2 * (ai(j) + max_acc_) * ts_inv2;
+      }
+      else
+      {
+        /* code */
+      }
+    }
+  }
+}
+
+void BsplineOpt::calcCollisionCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient)
+{
+  cost = 0.0;
+  int end_idx = q.cols() - order_;
+  double demarcation = dist0_/2;
+  double a = 3 * demarcation, b = -3 * pow(demarcation, 2), c = pow(demarcation, 3);
+  for (auto i = order_; i < end_idx; ++i)
+  {
+    Eigen::Vector3d pt = q.col(i);
+    Eigen::Vector3d gradient(0, 0, 0);
+    double edt_result;
+    path_finder->getEDTValueGradient(pt, edt_result, gradient);
+    double dist_err = dist0_ - edt_result;
+
+    if (dist_err < 0){}
+    else if (dist_err < demarcation)
+    {
+      cost += pow(dist_err, 3);
+      gradient.col(i) += -3.0 * dist_err * dist_err * gradient;
+    }
+    else
+    {
+      cost += a * dist_err * dist_err + b * dist_err + c;
+      gradient.col(i) += -(2.0 * a * dist_err + b) * gradient;
+    }
+  }
+}
+
+void BsplineOpt::calcFitnessCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient)
+{
+
+}
+
+void BsplineOpt::calcCurvatureCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient)
+{
+
+}
+
+void BsplineOpt::combineOptCost()
+{
+  
+}
+
+void BsplineOpt::combineAdjCost()
+{
+
 }

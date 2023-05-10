@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <iostream>
 #include <ros/ros.h>
+#include "Astar_searcher.h"
 
 using namespace std;
 
@@ -87,18 +88,29 @@ private:
     double lambda4_;              // curvature weight
     double lambda5_;              // fitness weight
     double dist0_;                // safe distance
-    double max_vel_, min_vel, max_acc_;    // dynamic limits
+    double max_vel_, min_vel_, max_acc_;    // dynamic limits
     int order_;                   // spline order
     double cp_dist_;              // control points distance
     Eigen::Vector3d end_pt_;
     Eigen::Vector3d start_pt_;
 
     UniformBspline bspline;
+    AstarPathFinder* path_finder;
+
+    // q control points mat, double cost, mat gradient
+    void calcSmoothnessCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient);
+    void calcFeasibilityCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient);
+    void calcCollisionCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient);
+    void calcFitnessCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient);
+    void calcCurvatureCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient);
+
 public:
-    BsplineOpt() {printf("initializing bspline optimizer\n");};
+    BsplineOpt() {};
     ~BsplineOpt() {};
-    void set_param(ros::NodeHandle* nh);
+    void set_param(ros::NodeHandle* nh, AstarPathFinder* new_path_finder);
     void set_bspline(std::vector<Eigen::Vector3d> A_Star_Path, std::vector<Eigen::Vector3d> start_target_derivetive);
     UniformBspline get_bspline();
+    void combineOptCost();
+    void combineAdjCost();
 };
 #endif

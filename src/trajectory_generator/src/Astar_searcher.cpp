@@ -669,3 +669,32 @@ int AstarPathFinder::safeCheck(MatrixXd polyCoeff, VectorXd time) {
   // Du: safety check of polynomial traj
   return unsafe_segment;
 }
+
+bool AstarPathFinder::getEDTValueGradient(Eigen::Vector3d pt, double & EDT_result, Vector3d & gradient)
+{
+  Vector3i idxlll = coord2gridIndex(pt);
+  Vector3i idxllh = idxlll + Vector3i(0, 0, 1);
+  Vector3i idxlhl = idxlll + Vector3i(0, 1, 0);
+  Vector3i idxhll = idxlll + Vector3i(1, 0, 0);
+  Vector3i idxhhl = idxlll + Vector3i(1, 1, 0);
+  Vector3i idxhlh = idxlll + Vector3i(1, 0, 1);
+  Vector3i idxlhh = idxlll + Vector3i(0, 1, 1);
+  Vector3i idxhhh = idxlll + Vector3i(0, 1, 1);
+  double edtlll = EDT[idxlll(0)*GLYZ_SIZE+idxlll(1)*GLZ_SIZE+idxlll(2)]*resolution;
+  double edtllh = EDT[idxllh(0)*GLYZ_SIZE+idxllh(1)*GLZ_SIZE+idxllh(2)]*resolution;
+  double edtlhl = EDT[idxlhl(0)*GLYZ_SIZE+idxlhl(1)*GLZ_SIZE+idxlhl(2)]*resolution;
+  double edthll = EDT[idxhll(0)*GLYZ_SIZE+idxhll(1)*GLZ_SIZE+idxhll(2)]*resolution;
+  double edthhl = EDT[idxhhl(0)*GLYZ_SIZE+idxhhl(1)*GLZ_SIZE+idxhhl(2)]*resolution;
+  double edthlh = EDT[idxhlh(0)*GLYZ_SIZE+idxhlh(1)*GLZ_SIZE+idxhlh(2)]*resolution;
+  double edtlhh = EDT[idxlhh(0)*GLYZ_SIZE+idxlhh(1)*GLZ_SIZE+idxlhh(2)]*resolution;
+  double edthhh = EDT[idxhhh(0)*GLYZ_SIZE+idxhhh(1)*GLZ_SIZE+idxhhh(2)]*resolution;
+  double xd = (pt(0)-gl_xl)*inv_resolution - double(idxlll(0));
+  double yd = (pt(1)-gl_yl)*inv_resolution - double(idxlll(1));
+  double zd = (pt(2)-gl_zl)*inv_resolution - double(idxlll(2));
+  EDT_result =  edtlll*(1-xd)*(1-yd)*(1-zd)+edthll*xd*(1-yd)*(1-zd)+edtlhl*(1-xd)*yd*(1-zd)+edtllh*(1-xd)*(1-yd)*zd
+                +edthlh*xd*(1-yd)*zd+edtlhh*(1-xd)*yd*zd+edthhl*xd*yd*(1-zd)+edthhh*xd*yd*zd;
+  gradient(0) = ((edthll - edtlll) + (edthhl - edtlhl) + (edthlh - edtllh) + (edthhh - edtlhh))/4;
+  gradient(1) = ((edtlhl - edtlll) + (edthhl - edthll) + (edtlhh - edtllh) + (edthhh - edthlh))/4;
+  gradient(2) = ((edtllh - edtlll) + (edthlh - edthll) + (edtlhh - edtlhl) + (edthhh - edthhl))/4;
+  return true;
+}

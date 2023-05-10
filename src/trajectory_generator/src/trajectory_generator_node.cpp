@@ -311,7 +311,7 @@ bool trajGeneration() {
   _astar_path_finder->AstarGraphSearch(start_pt, target_pt);
   auto grid_path = _astar_path_finder->getPath();
   BsplineOpt bspline_opt;
-  bspline_opt.set_param(nh_ptr);
+  bspline_opt.set_param(nh_ptr, _astar_path_finder);
   vector<Vector3d> start_target_derivative;
 
   start_target_derivative.push_back(start_vel);
@@ -368,6 +368,9 @@ bool trajGeneration() {
     */
 }
 
+/*
+  generate cyclical waypoints for hovering above goal
+*/
 bool defaultTrajGeneration()
 {
   MatrixXd cur_control_pt = cur_bspline_traj.getControlPoint();
