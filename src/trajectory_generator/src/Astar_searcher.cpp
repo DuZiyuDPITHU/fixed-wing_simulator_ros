@@ -670,7 +670,7 @@ int AstarPathFinder::safeCheck(MatrixXd polyCoeff, VectorXd time) {
   return unsafe_segment;
 }
 
-bool AstarPathFinder::getEDTValueGradient(Eigen::Vector3d pt, double & EDT_result, Vector3d & gradient)
+bool AstarPathFinder::getEDTValueGradient(Eigen::Vector3d pt, double & EDT_result, Eigen::Vector3d & gradient)
 {
   Vector3i idxlll = coord2gridIndex(pt);
   Vector3i idxllh = idxlll + Vector3i(0, 0, 1);

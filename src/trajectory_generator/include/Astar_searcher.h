@@ -59,7 +59,7 @@ class AstarPathFinder
 		Eigen::Vector3d getPosPoly( Eigen::MatrixXd polyCoeff, int k, double t );
 		int safeCheck( Eigen::MatrixXd polyCoeff, Eigen::VectorXd time);
 		void updateEDT(std::vector<Eigen::Vector3i> new_voxel);
-		bool getEDTValueGradient(Eigen::Vector3d pt, double & EDT_result, Vector3d & gradient);
+		bool getEDTValueGradient(Eigen::Vector3d pt, double & EDT_result, Eigen::Vector3d & gradient);
 };
 
 #endif

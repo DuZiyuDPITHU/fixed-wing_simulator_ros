@@ -52,6 +52,7 @@ public:
 
   Eigen::VectorXd evaluateDeBoor(const double &u);                                               // use u \in [up, u_mp]
   inline Eigen::VectorXd evaluateDeBoorT(const double &t) { return evaluateDeBoor(t + u_(p_)); } // use t \in [0, duration]
+  inline int getControlPtSize(){return control_points_.cols();}
   UniformBspline getDerivative();
 
   // 3D B-spline interpolation of points in point_set, with boundary vel&acc
@@ -82,6 +83,16 @@ public:
 class BsplineOpt
 {
 private:
+    enum FORCE_STOP_OPTIMIZE_TYPE
+    {
+      DONT_STOP,
+      STOP_FOR_REBOUND,
+      STOP_FOR_ERROR
+    } force_stop_type_;
+    int iter_num_;
+    int variable_num_;
+    double min_cost_;
+
     double lambda1_;              // smoothness weight
     double lambda2_;              // collision weight
     double lambda3_;              // feasibility weight
@@ -93,6 +104,7 @@ private:
     double cp_dist_;              // control points distance
     Eigen::Vector3d end_pt_;
     Eigen::Vector3d start_pt_;
+    Eigen::MatrixXd control_pts;
 
     UniformBspline bspline;
     AstarPathFinder* path_finder;
@@ -110,7 +122,10 @@ public:
     void set_param(ros::NodeHandle* nh, AstarPathFinder* new_path_finder);
     void set_bspline(std::vector<Eigen::Vector3d> A_Star_Path, std::vector<Eigen::Vector3d> start_target_derivetive);
     UniformBspline get_bspline();
-    void combineOptCost();
-    void combineAdjCost();
+    void combineOptCost(const double *x, double *grad, double &f_combine, const int n);
+    void combineAdjCost(const double *x, double *grad, double &f_combine, const int n);
+    static int earlyExit(void *func_data, const double *x, const double *g, const double fx, const double xnorm, const double gnorm, const double step, int n, int k, int ls);
+    static double costFunctionOpt(void *func_data, const double *x, double *grad, const int n);
+    bool optStage();
 };
 #endif

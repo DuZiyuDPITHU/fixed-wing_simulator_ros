@@ -1,4 +1,5 @@
 #include "uniform_bspline.h"
+#include "Astar_searcher.h"
 #include "lbfgs.hpp"
 #include <ros/ros.h>
 
@@ -387,10 +388,13 @@ void BsplineOpt::set_param(ros::NodeHandle* nh, AstarPathFinder* new_path_finder
   nh->param("optimization/dist0", dist0_, -1.0);
   nh->param("optimization/max_vel", max_vel_, -1.0);
   nh->param("optimization/max_acc", max_acc_, -1.0);
-  nh->param("optimization/min_vel", min_vel, -1.0);
+  nh->param("optimization/min_vel", min_vel_, -1.0);
   nh->param("optimization/order_", order_, 3);
   nh->param("optimization/control_points_distance", cp_dist_, 5.0);
   path_finder = new_path_finder;
+  force_stop_type_ = DONT_STOP;
+  iter_num_ = 0;
+  variable_num_ = 0;
 }
 
 void BsplineOpt::set_bspline(std::vector<Eigen::Vector3d> A_Star_Path, std::vector<Eigen::Vector3d> start_target_derivative)
@@ -446,6 +450,7 @@ void BsplineOpt::set_bspline(std::vector<Eigen::Vector3d> A_Star_Path, std::vect
   double ts = cp_dist_ / max_vel_ * 5;
   bspline.parameterizeToBspline(ts,points_inv, start_target_derivative, control_points);
   bspline = UniformBspline(control_points, order_, ts);
+  control_pts = bspline.get_control_points();
   printf("gen\n");
 }
 
@@ -590,12 +595,150 @@ void BsplineOpt::calcCurvatureCost(const Eigen::MatrixXd &q, double &cost, Eigen
 
 }
 
-void BsplineOpt::combineOptCost()
+void BsplineOpt::combineOptCost(const double *x, double *grad, double &f_combine, const int n)
 {
+  double f_smoothness, f_distance, f_feasibility;
+
+  Eigen::MatrixXd g_smoothness = Eigen::MatrixXd::Zero(3, bspline.getControlPtSize());
+  Eigen::MatrixXd g_distance = Eigen::MatrixXd::Zero(3, bspline.getControlPtSize());
+  Eigen::MatrixXd g_feasibility = Eigen::MatrixXd::Zero(3, bspline.getControlPtSize());
+
+  memcpy(control_pts.data()+3*order_, x, n*sizeof(x[0]));
+
   
+  calcSmoothnessCost(control_pts, f_smoothness, g_smoothness);
+  calcCollisionCost(control_pts, f_distance, g_distance);
+  calcFeasibilityCost(control_pts, f_feasibility, g_feasibility);
+
+  f_combine = lambda1_ * f_smoothness + lambda2_ * f_distance + lambda3_ * f_feasibility;
+  Eigen::MatrixXd grad_3D = lambda1_ * g_smoothness + lambda2_ * g_distance + lambda3_ * g_feasibility;
+  memcpy(grad, grad_3D.data() + 3 * order_, n * sizeof(grad[0]));
 }
 
-void BsplineOpt::combineAdjCost()
+void BsplineOpt::combineAdjCost(const double *x, double *grad, double &f_combine, const int n)
 {
 
+}
+
+int BsplineOpt::earlyExit(void *func_data, const double *x, const double *g, const double fx, const double xnorm, const double gnorm, const double step, int n, int k, int ls)
+{
+  BsplineOpt *opt = reinterpret_cast<BsplineOpt *>(func_data);
+  // cout << "k=" << k << endl;
+  // cout << "opt->flag_continue_to_optimize_=" << opt->flag_continue_to_optimize_ << endl;
+  return (opt->force_stop_type_ == STOP_FOR_ERROR || opt->force_stop_type_ == STOP_FOR_REBOUND);
+}
+
+double BsplineOpt::costFunctionOpt(void *func_data, const double *x, double *grad, const int n)
+{
+  BsplineOpt *opt = reinterpret_cast<BsplineOpt *>(func_data);
+  double cost;
+  opt->combineOptCost(x, grad, cost, n);
+
+  opt->iter_num_ += 1;
+  return cost;
+}
+
+bool BsplineOpt::optStage()
+{
+  iter_num_ = 0;
+  int start_id = order_;
+  int end_id = this->bspline.getControlPoint().cols() - order_;
+  variable_num_ = 3 * (end_id - start_id);
+  double final_cost;
+
+  ros::Time t0 = ros::Time::now(), t1, t2;
+  int restart_nums = 0, rebound_times = 0;
+  ;
+  bool flag_force_return, flag_occ, success;
+  constexpr int MAX_RESART_NUMS_SET = 3;
+  do
+  {
+    /* ---------- prepare ---------- */
+    min_cost_ = std::numeric_limits<double>::max();
+    iter_num_ = 0;
+    flag_force_return = false;
+    flag_occ = false;
+    success = false;
+
+    double q[variable_num_];
+    memcpy(q, bspline.getControlPoint().data() + 3 * start_id, variable_num_ * sizeof(q[0]));
+
+    lbfgs::lbfgs_parameter_t lbfgs_params;
+    lbfgs::lbfgs_load_default_parameters(&lbfgs_params);
+    lbfgs_params.mem_size = 16;
+    lbfgs_params.max_iterations = 200;
+    lbfgs_params.g_epsilon = 0.01;
+
+    /* ---------- optimize ---------- */
+    t1 = ros::Time::now();
+    int result = lbfgs::lbfgs_optimize(variable_num_, q, &final_cost, BsplineOpt::costFunctionOpt, NULL, BsplineOpt::earlyExit, this, &lbfgs_params);
+    t2 = ros::Time::now();
+    double time_ms = (t2 - t1).toSec() * 1000;
+    double total_time_ms = (t2 - t0).toSec() * 1000;
+
+    /* ---------- success temporary, check collision again ---------- */
+    if (result == lbfgs::LBFGS_CONVERGENCE ||
+        result == lbfgs::LBFGSERR_MAXIMUMITERATION ||
+        result == lbfgs::LBFGS_ALREADY_MINIMIZED ||
+        result == lbfgs::LBFGS_STOP)
+    {
+      ROS_WARN("Solver error in planning!, return = %s", lbfgs::lbfgs_strerror(result));
+      flag_force_return = false;
+      /*
+      UniformBspline traj = UniformBspline(cps_.points, 3, bspline_interval_);
+      double tm, tmp;
+      traj.getTimeSpan(tm, tmp);
+      double t_step = (tmp - tm) / ((traj.evaluateDeBoorT(tmp) - traj.evaluateDeBoorT(tm)).norm() / grid_map_->getResolution());
+      for (double t = tm; t < tmp * 2 / 3; t += t_step) // Only check the closest 2/3 partition of the whole trajectory.
+      {
+        flag_occ = grid_map_->getInflateOccupancy(traj.evaluateDeBoorT(t));
+        if (flag_occ)
+        {
+          //cout << "hit_obs, t=" << t << " P=" << traj.evaluateDeBoorT(t).transpose() << endl;
+
+          if (t <= bspline_interval_) // First 3 control points in obstacles!
+          {
+            cout << cps_.points.col(1).transpose() << "\n"
+                  << cps_.points.col(2).transpose() << "\n"
+                  << cps_.points.col(3).transpose() << "\n"
+                  << cps_.points.col(4).transpose() << endl;
+            ROS_WARN("First 3 control points in obstacles! return false, t=%f", t);
+            return false;
+          }
+
+          break;
+        }
+      }
+      */
+      if (!flag_occ)
+      {
+        printf("\033[32miter(+1)=%d,time(ms)=%5.3f,total_t(ms)=%5.3f,cost=%5.3f\n\033[0m", iter_num_, time_ms, total_time_ms, final_cost);
+        success = true;
+      }
+      else // restart
+      {
+        /*
+        restart_nums++;
+        initControlPoints(cps_.points, false);
+        new_lambda2_ *= 2;
+        */
+        printf("\033[32miter(+1)=%d,time(ms)=%5.3f,keep optimizing\n\033[0m", iter_num_, time_ms);
+      }
+    }
+    else if (result == lbfgs::LBFGSERR_CANCELED)
+    {
+      flag_force_return = true;
+      rebound_times++;
+      cout << "iter=" << iter_num_ << ",time(ms)=" << time_ms << ",rebound." << endl;
+    }
+    else
+    {
+      ROS_WARN("Solver error. Return = %d, %s. Skip this planning.", result, lbfgs::lbfgs_strerror(result));
+      // while (ros::ok());
+    }
+
+  } while ((flag_occ && restart_nums < MAX_RESART_NUMS_SET) ||
+            (flag_force_return && force_stop_type_ == STOP_FOR_REBOUND && rebound_times <= 20));
+
+  return success;
 }

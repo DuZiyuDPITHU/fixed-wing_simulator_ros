@@ -320,6 +320,7 @@ bool trajGeneration() {
   start_target_derivative.push_back(Vector3d(0, 0, 0));
 
   bspline_opt.set_bspline(grid_path, start_target_derivative);
+  bspline_opt.optStage();
   UniformBspline bspline(bspline_opt.get_bspline());
   //std::cout<<bspline.get_control_points()<<std::endl;
   time_traj_start = ros::Time::now();
