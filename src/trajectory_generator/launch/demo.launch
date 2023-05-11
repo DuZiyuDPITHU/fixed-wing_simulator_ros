@@ -2,7 +2,7 @@
 
 <arg name="map_size_x" default="200.0"/>
 <arg name="map_size_y" default="200.0"/>
-<arg name="map_size_z" default="10.0"/>
+<arg name="map_size_z" default="15.0"/>
 <arg name="map_frame_name"  default="world"/>
 
 <arg name="start_x" default=" -15.0"/>
@@ -74,8 +74,8 @@
 
     <param name="ObstacleShape/lower_rad" value="4"/>
     <param name="ObstacleShape/upper_rad" value="10"/>
-    <param name="ObstacleShape/lower_hei" value="1.0"/>
-    <param name="ObstacleShape/upper_hei" value="2.5"/>
+    <param name="ObstacleShape/lower_hei" value="5.0"/>
+    <param name="ObstacleShape/upper_hei" value="6.0"/>
     <param name="CircleShape/lower_circle_rad"   value="0.6"/>        
     <param name="CircleShape/upper_circle_rad"   value="3.5"/>        
     

@@ -96,7 +96,7 @@ void AstarPathFinder::setObs(const double coord_x, const double coord_y,
   }
   else {
     if (data[idx_x * GLYZ_SIZE + idx_y * GLZ_SIZE + idx_z] == uint8_t(0)){
-      printf("a\n");
+      printf(".");
       new_voxel.push_back(Vector3i(idx_x, idx_y, idx_z));
       data[idx_x * GLYZ_SIZE + idx_y * GLZ_SIZE + idx_z] = 1;
       count ++;
@@ -673,6 +673,7 @@ int AstarPathFinder::safeCheck(MatrixXd polyCoeff, VectorXd time) {
 bool AstarPathFinder::getEDTValueGradient(Eigen::Vector3d pt, double & EDT_result, Eigen::Vector3d & gradient)
 {
   Vector3i idxlll = coord2gridIndex(pt);
+  //cout<< idxlll <<endl;
   Vector3i idxllh = idxlll + Vector3i(0, 0, 1);
   Vector3i idxlhl = idxlll + Vector3i(0, 1, 0);
   Vector3i idxhll = idxlll + Vector3i(1, 0, 0);
@@ -693,8 +694,11 @@ bool AstarPathFinder::getEDTValueGradient(Eigen::Vector3d pt, double & EDT_resul
   double zd = (pt(2)-gl_zl)*inv_resolution - double(idxlll(2));
   EDT_result =  edtlll*(1-xd)*(1-yd)*(1-zd)+edthll*xd*(1-yd)*(1-zd)+edtlhl*(1-xd)*yd*(1-zd)+edtllh*(1-xd)*(1-yd)*zd
                 +edthlh*xd*(1-yd)*zd+edtlhh*(1-xd)*yd*zd+edthhl*xd*yd*(1-zd)+edthhh*xd*yd*zd;
+  //printf("EDT: %f\n", EDT_result);
   gradient(0) = ((edthll - edtlll) + (edthhl - edtlhl) + (edthlh - edtllh) + (edthhh - edtlhh))/4;
   gradient(1) = ((edtlhl - edtlll) + (edthhl - edthll) + (edtlhh - edtllh) + (edthhh - edthlh))/4;
   gradient(2) = ((edtllh - edtlll) + (edthlh - edthll) + (edtlhh - edtlhl) + (edthhh - edthhl))/4;
+  gradient = gradient.normalized();
+  //cout<<gradient<<endl;
   return true;
 }

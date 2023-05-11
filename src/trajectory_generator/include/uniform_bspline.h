@@ -120,7 +120,7 @@ public:
     BsplineOpt() {};
     ~BsplineOpt() {};
     void set_param(ros::NodeHandle* nh, AstarPathFinder* new_path_finder);
-    void set_bspline(std::vector<Eigen::Vector3d> A_Star_Path, std::vector<Eigen::Vector3d> start_target_derivetive);
+    bool set_bspline(std::vector<Eigen::Vector3d> A_Star_Path, std::vector<Eigen::Vector3d> start_target_derivetive);
     UniformBspline get_bspline();
     void combineOptCost(const double *x, double *grad, double &f_combine, const int n);
     void combineAdjCost(const double *x, double *grad, double &f_combine, const int n);

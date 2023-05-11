@@ -397,7 +397,7 @@ void BsplineOpt::set_param(ros::NodeHandle* nh, AstarPathFinder* new_path_finder
   variable_num_ = 0;
 }
 
-void BsplineOpt::set_bspline(std::vector<Eigen::Vector3d> A_Star_Path, std::vector<Eigen::Vector3d> start_target_derivative)
+bool BsplineOpt::set_bspline(std::vector<Eigen::Vector3d> A_Star_Path, std::vector<Eigen::Vector3d> start_target_derivative)
 {
   //printf("setting bspline\n");
   start_pt_ = A_Star_Path.front();
@@ -446,12 +446,12 @@ void BsplineOpt::set_bspline(std::vector<Eigen::Vector3d> A_Star_Path, std::vect
     points_inv.push_back(points[i]);
     count ++;
   }
-  //cout<<control_points.transpose() << endl;
+  if (points_inv.size()<4) return false;
   double ts = cp_dist_ / max_vel_ * 5;
   bspline.parameterizeToBspline(ts,points_inv, start_target_derivative, control_points);
   bspline = UniformBspline(control_points, order_, ts);
   control_pts = bspline.get_control_points();
-  printf("gen\n");
+  return true;
 }
 
 UniformBspline BsplineOpt::get_bspline()
@@ -566,21 +566,20 @@ void BsplineOpt::calcCollisionCost(const Eigen::MatrixXd &q, double &cost, Eigen
   for (auto i = order_; i < end_idx; ++i)
   {
     Eigen::Vector3d pt = q.col(i);
-    Eigen::Vector3d gradient(0, 0, 0);
+    Eigen::Vector3d pt_gradient(0, 0, 0);
     double edt_result;
-    path_finder->getEDTValueGradient(pt, edt_result, gradient);
+    path_finder->getEDTValueGradient(pt, edt_result, pt_gradient);
     double dist_err = dist0_ - edt_result;
-
     if (dist_err < 0){}
     else if (dist_err < demarcation)
     {
       cost += pow(dist_err, 3);
-      gradient.col(i) += -3.0 * dist_err * dist_err * gradient;
+      gradient.col(i) += -3.0 * dist_err * dist_err * pt_gradient;
     }
     else
     {
       cost += a * dist_err * dist_err + b * dist_err + c;
-      gradient.col(i) += -(2.0 * a * dist_err + b) * gradient;
+      gradient.col(i) += -(2.0 * a * dist_err + b) * pt_gradient;
     }
   }
 }
@@ -605,12 +604,15 @@ void BsplineOpt::combineOptCost(const double *x, double *grad, double &f_combine
 
   memcpy(control_pts.data()+3*order_, x, n*sizeof(x[0]));
 
-  
+  cout << control_pts << endl;
   calcSmoothnessCost(control_pts, f_smoothness, g_smoothness);
+  //printf("b\n");
   calcCollisionCost(control_pts, f_distance, g_distance);
+  //printf("c\n");
   calcFeasibilityCost(control_pts, f_feasibility, g_feasibility);
 
   f_combine = lambda1_ * f_smoothness + lambda2_ * f_distance + lambda3_ * f_feasibility;
+  //printf("current f_combine: %f\n");
   Eigen::MatrixXd grad_3D = lambda1_ * g_smoothness + lambda2_ * g_distance + lambda3_ * g_feasibility;
   memcpy(grad, grad_3D.data() + 3 * order_, n * sizeof(grad[0]));
 }
@@ -640,6 +642,7 @@ double BsplineOpt::costFunctionOpt(void *func_data, const double *x, double *gra
 
 bool BsplineOpt::optStage()
 {
+  printf("Start optimization stage\n");
   iter_num_ = 0;
   int start_id = order_;
   int end_id = this->bspline.getControlPoint().cols() - order_;

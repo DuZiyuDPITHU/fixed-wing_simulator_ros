@@ -182,6 +182,7 @@ void execCallback(const ros::TimerEvent &e) {
     bool success = trajGeneration();
     if (success)
       changeState(EXEC_TRAJ, "STATE");
+    
     else
       changeState(GEN_NEW_TRAJ, "STATE");
     break;
@@ -319,7 +320,8 @@ bool trajGeneration() {
   start_target_derivative.push_back(Vector3d(0, 0, 0));
   start_target_derivative.push_back(Vector3d(0, 0, 0));
 
-  bspline_opt.set_bspline(grid_path, start_target_derivative);
+  bool success_flag = bspline_opt.set_bspline(grid_path, start_target_derivative);
+  if (!success_flag) return false;
   bspline_opt.optStage();
   UniformBspline bspline(bspline_opt.get_bspline());
   //std::cout<<bspline.get_control_points()<<std::endl;
@@ -341,12 +343,14 @@ bool trajGeneration() {
    * STEP 2:  Simplify the path: use the RDP algorithm
    *
    * **/
+  /*
   grid_path = _astar_path_finder->pathSimplify(grid_path, _path_resolution);
   MatrixXd path(int(grid_path.size()), 3);
   for (int k = 0; k < int(grid_path.size()); k++) {
     path.row(k) = grid_path[k];
   }
   printf("Simplify A* traj.\n");
+  */
   return true;
   /**
    *
