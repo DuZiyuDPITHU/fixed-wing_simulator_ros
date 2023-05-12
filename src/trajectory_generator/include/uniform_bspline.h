@@ -92,6 +92,17 @@ private:
     int iter_num_;
     int variable_num_;
     double min_cost_;
+    const struct curvature_opt_const
+    {
+      double pdcx_x10 = -0.5;   double pdcx_x20 = 0;
+      double pdcx_x30 = 0.5;    double pdcx_x40 = 0;
+      double pdcx_x1h = -0.125; double pdcx_x2h = -0.625;
+      double pdcx_x3h = 0.625;  double pdcx_x4h = 0.125;
+      double pddcx_x10 = 1;     double pddcx_x20 = -2;
+      double pddcx_x30 = 1;     double pddcx_x40 = 0;
+      double pddcx_x1h = 0.5;   double pddcx_x2h = -0.5;
+      double pddcx_x3h = 0.25;  double pddcx_x4h = 0.5;
+    } coc;
 
     double lambda1_;              // smoothness weight
     double lambda2_;              // collision weight
@@ -100,11 +111,13 @@ private:
     double lambda5_;              // fitness weight
     double dist0_;                // safe distance
     double max_vel_, min_vel_, max_acc_;    // dynamic limits
+    double max_K_;
     int order_;                   // spline order
     double cp_dist_;              // control points distance
     Eigen::Vector3d end_pt_;
     Eigen::Vector3d start_pt_;
     Eigen::MatrixXd control_pts;
+    std::vector<Eigen::Vector3d> ref_pts_;
 
     UniformBspline bspline;
     AstarPathFinder* path_finder;
@@ -126,6 +139,8 @@ public:
     void combineAdjCost(const double *x, double *grad, double &f_combine, const int n);
     static int earlyExit(void *func_data, const double *x, const double *g, const double fx, const double xnorm, const double gnorm, const double step, int n, int k, int ls);
     static double costFunctionOpt(void *func_data, const double *x, double *grad, const int n);
+    static double costFunctionAdj(void *func_data, const double *x, double *grad, const int n);
     bool optStage();
+    bool adjStage();
 };
 #endif

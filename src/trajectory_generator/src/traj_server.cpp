@@ -239,7 +239,7 @@ int main(int argc, char **argv)
   printf("start traj server node\n");
   ros::Subscriber bspline_sub = node.subscribe("trajectory_generator_node/bspline_trajectory", 10, bsplineCallback);
 
-  pos_cmd_pub = node.advertise<quadrotor_msgs::PositionCommand>("position_cmd", 50);
+  pos_cmd_pub = node.advertise<quadrotor_msgs::PositionCommand>("position_cmd", 20);
 
   ros::Timer cmd_timer = node.createTimer(ros::Duration(0.01), cmdCallback);
 

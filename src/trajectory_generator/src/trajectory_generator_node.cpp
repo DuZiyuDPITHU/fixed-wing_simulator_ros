@@ -56,7 +56,7 @@ ros::Publisher _traj_vis_pub, _traj_pub, _path_vis_pub;
 ros::Publisher bspline_pub;
 
 // for planning
-Vector3d odom_pt, odom_vel, start_pt, target_pt, start_vel;
+Vector3d odom_pt, odom_vel, start_pt, target_pt, target_vel, target_acc, start_vel, start_acc(0, 0, 0);
 int _poly_num1D;
 MatrixXd _polyCoeff;
 VectorXd _polyTime;
@@ -65,9 +65,13 @@ double time_duration_default;
 ros::Time time_traj_start;
 bool has_odom = false;
 bool has_target = false;
+bool has_default = false;
 UniformBspline cur_bspline_traj;
 UniformBspline cur_bspline_vel;
+UniformBspline cur_bspline_acc;
 UniformBspline default_traj;
+UniformBspline default_vel;
+UniformBspline default_acc;
 int hovering_pub_count = 0;
 ros::Time time_hovering_start;
 
@@ -86,7 +90,7 @@ void execCallback(const ros::TimerEvent &e);
 // declare
 void changeState(STATE new_state, string pos_call);
 void printState();
-void visTrajectory(MatrixXd polyCoeff, VectorXd time);
+void visTrajectory(bool if_default);
 void visPath(MatrixXd nodes);
 void trajOptimization(Eigen::MatrixXd path);
 void rcvOdomCallback(const nav_msgs::Odometry::ConstPtr &odom);
@@ -96,6 +100,7 @@ void trajPublish(MatrixXd polyCoeff, VectorXd time);
 void bspline_traj_pub(UniformBspline* uniform_bspline_ptr);
 bool trajGeneration();
 bool defaultTrajGeneration();
+
 Vector3d zRotate(Vector3d origin_vec, double angle);
 VectorXd timeAllocation(MatrixXd Path);
 Vector3d getPos(double t_cur);
@@ -162,6 +167,7 @@ void execCallback(const ros::TimerEvent &e) {
       {
         time_hovering_start = ros::Time::now();
         bspline_traj_pub(&default_traj);
+        visTrajectory(true);
         hovering_pub_count++;
         return;
       }
@@ -169,12 +175,23 @@ void execCallback(const ros::TimerEvent &e) {
       {
         ros::Time time_now = ros::Time::now();
         double t_cur = (time_now - time_hovering_start).toSec();
-        if (t_cur > time_duration_default - 1e-6)
+        if (t_cur > time_duration_default - 2e-3)
           hovering_pub_count = 0;
       }
     }
     else
+    {
+      if (has_default)
+      {
+        ros::Time time_now = ros::Time::now();
+        double t_cur = (time_now - time_hovering_start).toSec();
+        start_pt = default_traj.evaluateDeBoorT(t_cur);
+        start_vel= default_vel.evaluateDeBoorT(t_cur);
+        start_acc = default_acc.evaluateDeBoor(t_cur);
+        has_default = false;
+      }
       changeState(GEN_NEW_TRAJ, "STATE");
+    }
     break;
   }
 
@@ -194,7 +211,7 @@ void execCallback(const ros::TimerEvent &e) {
     double t_replan = ros::Duration(2, 0).toSec();
     t_cur = min(time_duration, t_cur);
 
-    if (t_cur > time_duration - 5e-1) {
+    if (t_cur > time_duration - 1e-4) {
       has_target = false;
       changeState(WAIT_TARGET, "STATE");
       return;
@@ -219,7 +236,8 @@ void execCallback(const ros::TimerEvent &e) {
     //start_vel = getVel(t_cur);
     start_pt = cur_bspline_traj.evaluateDeBoorT(t_cur);
     start_vel = cur_bspline_vel.evaluateDeBoorT(t_cur);
-    std::cout<< "current time: " << t_cur << std::endl << start_pt.transpose() << std::endl;
+    start_acc = cur_bspline_acc.evaluateDeBoorT(t_cur);
+    //std::cout<< "current time: " << t_cur << std::endl << start_pt.transpose() << std::endl;
     //start_vel = odom_vel;
     bool success = trajGeneration();
     if (success)
@@ -242,7 +260,18 @@ void rcvWaypointsCallBack(const nav_msgs::Path &wp) {
   has_target = true;
 
   if (exec_state == WAIT_TARGET)
+  {
     changeState(GEN_NEW_TRAJ, "STATE");
+    if (has_default)
+    {
+      ros::Time time_now = ros::Time::now();
+      double t_cur = (time_now - time_hovering_start).toSec();
+      start_pt = default_traj.evaluateDeBoorT(t_cur);
+      start_vel= default_vel.evaluateDeBoorT(t_cur);
+      start_acc = default_acc.evaluateDeBoorT(t_cur);
+      has_default = false;
+    }
+  }
   else if (exec_state == EXEC_TRAJ){
     printf("replan due to rcv waypoint\n");
     changeState(REPLAN_TRAJ, "STATE");}
@@ -258,7 +287,7 @@ void bspline_traj_pub(UniformBspline* uniform_bspline_ptr)
   
   bspline.pos_pts.reserve(pos_pts.cols());
   printf("Trajectory_generator: publishing bspline traj\n");
-  std::cout << pos_pts << std::endl;
+  //std::cout << pos_pts << std::endl;
   for (int i = 0; i < pos_pts.cols(); ++i)
   {
     geometry_msgs::Point pt;
@@ -311,30 +340,50 @@ bool trajGeneration() {
   _astar_path_finder->resetUsedGrids();
   _astar_path_finder->AstarGraphSearch(start_pt, target_pt);
   auto grid_path = _astar_path_finder->getPath();
+  grid_path[0] = target_pt;
+  grid_path[grid_path.size()-1] = start_pt;
   BsplineOpt bspline_opt;
   bspline_opt.set_param(nh_ptr, _astar_path_finder);
   vector<Vector3d> start_target_derivative;
 
   start_target_derivative.push_back(start_vel);
-  start_target_derivative.push_back((grid_path[0]-grid_path[1]).normalized()*hovering_speed);
-  start_target_derivative.push_back(Vector3d(0, 0, 0));
-  start_target_derivative.push_back(Vector3d(0, 0, 0));
-
+  if (has_default) start_target_derivative.push_back(target_vel);
+  else 
+  {
+    Vector3d vel_direction(0, 0, 0);
+    vel_direction(0) = (grid_path[0]-grid_path[1])(0);
+    vel_direction(1) = (grid_path[0]-grid_path[1])(1);
+    start_target_derivative.push_back(vel_direction.normalized()*hovering_speed);
+    target_vel = start_target_derivative[1];
+  }
+  start_target_derivative.push_back(start_acc);
+  if (has_default) start_target_derivative.push_back(target_acc);
+  else
+  {
+    start_target_derivative.push_back(hovering_speed*hovering_speed/hovering_radius*zRotate(start_target_derivative[1].normalized(), -dPI/2));
+    target_acc = start_target_derivative[3];
+  }
   bool success_flag = bspline_opt.set_bspline(grid_path, start_target_derivative);
   if (!success_flag) return false;
   bspline_opt.optStage();
+  bspline_opt.adjStage();
   UniformBspline bspline(bspline_opt.get_bspline());
   //std::cout<<bspline.get_control_points()<<std::endl;
   time_traj_start = ros::Time::now();
   time_duration = bspline.getTimeSum();
   bspline_traj_pub(&bspline);
-
   cur_bspline_traj = bspline;
   cur_bspline_vel = cur_bspline_traj.getDerivative();
+  cur_bspline_acc = cur_bspline_vel.getDerivative();
+  visTrajectory(false);
   if (cur_bspline_traj.get_control_points().cols() > 2)
+  {
     defaultTrajGeneration();
     time_duration_default = default_traj.getTimeSum();
-  
+    default_vel = default_traj.getDerivative();
+    default_acc = default_vel.getDerivative();
+    has_default = true;
+  }
   printf("Get A* path\n");
   // Reset map for next call
 
@@ -381,23 +430,27 @@ bool defaultTrajGeneration()
   MatrixXd cur_control_pt = cur_bspline_traj.getControlPoint();
   if (cur_control_pt.cols()<3)
     return false;
-  Vector3d p0 = (cur_control_pt.col(cur_control_pt.cols()-3) - cur_control_pt.col(cur_control_pt.cols()-2)).normalized();
-  Vector3d hovering_center = target_pt + hovering_radius*zRotate((cur_control_pt.col(cur_control_pt.cols()-3) - cur_control_pt.col(cur_control_pt.cols()-2)).normalized(), dPI/2);
+  Vector3d p0;
+  p0 = -target_vel.normalized();
+  Vector3d hovering_center;
+  hovering_center = target_pt + hovering_radius*zRotate(p0, dPI/2);
   vector<Vector3d> points;
   double rotate_angles[7] = //{-2*dPI/3, dPI, 2*dPI/3, dPI/3, 0, -dPI/3, -2*dPI/3};
-  {-dPI/2, -5*dPI/6, 5*dPI/6, dPI/2, dPI/6, -dPI/6, -dPI/2};
-  //points.push_back(cur_control_pt.col(cur_control_pt.cols()-1));
-  for (int i=0;i<7;i++)
+  {-5*dPI/6, 5*dPI/6, dPI/2, dPI/6, -dPI/6};
+  points.push_back(target_pt);
+  for (int i=0;i<5;i++)
   {
     points.push_back(hovering_center+hovering_radius * zRotate(p0, rotate_angles[i]));
   }
+  points.push_back(target_pt);
   vector<Vector3d> start_target_derivative;
   start_target_derivative.push_back(-p0*hovering_speed);
-  start_target_derivative.push_back(-1.5*p0*hovering_speed);
-  start_target_derivative.push_back(Vector3d(0,0,0));
-  start_target_derivative.push_back(Vector3d(0,0,0));
+  start_target_derivative.push_back(-p0*hovering_speed);
+  start_target_derivative.push_back(hovering_speed*hovering_speed/hovering_radius*zRotate(p0, dPI/2));
+  start_target_derivative.push_back(start_target_derivative[2]);
+
   MatrixXd control_pt;
-  default_traj.parameterizeToBspline(hovering_radius/hovering_speed, points, start_target_derivative, control_pt);
+  default_traj.parameterizeToBspline(hovering_radius*2*dPI/6/hovering_speed, points, start_target_derivative, control_pt);
   default_traj.setUniformBspline(control_pt, 3, 0.8*hovering_radius/hovering_speed);
   return true;
 }
@@ -458,7 +511,7 @@ void trajOptimization(Eigen::MatrixXd path) {
   }
   // visulize path and trajectory
   visPath(repath);
-  visTrajectory(_polyCoeff, _polyTime);
+  //visTrajectory(_polyCoeff, _polyTime);
 }
 
 void trajPublish(MatrixXd polyCoeff, VectorXd time) {
@@ -519,7 +572,7 @@ VectorXd timeAllocation(MatrixXd Path) {
   return time;
 }
 
-void visTrajectory(MatrixXd polyCoeff, VectorXd time) {
+void visTrajectory(bool if_default) {
   visualization_msgs::Marker _traj_vis;
 
   _traj_vis.header.stamp = ros::Time::now();
@@ -546,14 +599,22 @@ void visTrajectory(MatrixXd polyCoeff, VectorXd time) {
   Vector3d pos;
   geometry_msgs::Point pt;
 
-  for (int i = 0; i < time.size(); i++) {
-    for (double t = 0.0; t < time(i); t += 0.01) {
-      pos = _trajGene->getPosPoly(polyCoeff, i, t);
-      pt.x = pos(0);
-      pt.y = pos(1);
-      pt.z = pos(2);
-      _traj_vis.points.push_back(pt);
-    }
+  double tm, tmp;
+  if (if_default)
+    default_traj.getTimeSpan(tm, tmp);
+  else
+    cur_bspline_traj.getTimeSpan(tm, tmp);
+
+  for (double t = tm; t <= tmp; t += 0.1) {
+    if (if_default)
+      pos = default_traj.evaluateDeBoorT(t);
+    else
+      pos = cur_bspline_traj.evaluateDeBoorT(t);
+    //cout << pos << endl;
+    pt.x = pos(0);
+    pt.y = pos(1);
+    pt.z = pos(2);
+    _traj_vis.points.push_back(pt);
   }
   _traj_vis_pub.publish(_traj_vis);
 }

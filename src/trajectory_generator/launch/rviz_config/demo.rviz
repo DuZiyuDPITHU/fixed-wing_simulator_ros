@@ -49,16 +49,16 @@ Visualization Manager:
     - Class: rviz/Group
       Displays:
         - Alpha: 1
-          Axes Length: 1
-          Axes Radius: 0.100000001
+          Axes Length: 3
+          Axes Radius: 0.200000001
           Class: rviz/Pose
           Color: 85; 255; 255
           Enabled: true
           Head Length: 0.300000012
-          Head Radius: 0.100000001
+          Head Radius: 0.200000001
           Name: Pose
-          Shaft Length: 1
-          Shaft Radius: 0.0500000007
+          Shaft Length: 2.5
+          Shaft Radius: 0.0200000007
           Shape: Axes
           #Topic: /traj_server/desired_position
           Topic: /odom_visualization/pose

@@ -53,7 +53,7 @@ bool UniformBspline::getTimeSpan(double &um, double &um_p)
 
   um = u_(p_);
   um_p = u_(m_ - p_);
-  printf("time span: %f\n", um_p-um);
+  //printf("time span: %f\n", um_p-um);
   return true;
 }
 
@@ -389,6 +389,7 @@ void BsplineOpt::set_param(ros::NodeHandle* nh, AstarPathFinder* new_path_finder
   nh->param("optimization/max_vel", max_vel_, -1.0);
   nh->param("optimization/max_acc", max_acc_, -1.0);
   nh->param("optimization/min_vel", min_vel_, -1.0);
+  nh->param("optimization/max_K", max_K_, -1.0);
   nh->param("optimization/order_", order_, 3);
   nh->param("optimization/control_points_distance", cp_dist_, 5.0);
   path_finder = new_path_finder;
@@ -405,17 +406,7 @@ bool BsplineOpt::set_bspline(std::vector<Eigen::Vector3d> A_Star_Path, std::vect
   double dist_count = 0;
   //Eigen::MatrixXd points = start_pt_;
   std::vector<Eigen::Vector3d> points;
-  Eigen::Vector3d fore_point;
-  for (int i=1; i<A_Star_Path.size(); i++)
-  {
-    dist_count += (A_Star_Path[i] - A_Star_Path[i-1]).norm();
-    if (dist_count > cp_dist_)
-    {
-      fore_point = start_pt_ - (A_Star_Path[i]-start_pt_);
-      break;
-    }
-  }
-  points.push_back(fore_point);
+
   points.push_back(start_pt_);
   
   for (int i=1; i<A_Star_Path.size(); i++)
@@ -586,12 +577,125 @@ void BsplineOpt::calcCollisionCost(const Eigen::MatrixXd &q, double &cost, Eigen
 
 void BsplineOpt::calcFitnessCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient)
 {
+  cost = 0.0;
 
+  int end_idx = q.cols() - order_;
+
+  // def: f = |x*v|^2/a^2 + |x×v|^2/b^2
+  double a2 = 25, b2 = 1;
+  for (auto i = order_ - 1; i < end_idx + 1; ++i)
+  {
+    Eigen::Vector3d x = (q.col(i - 1) + 4 * q.col(i) + q.col(i + 1)) / 6.0 - ref_pts_[i - 1];
+    Eigen::Vector3d v = (ref_pts_[i] - ref_pts_[i - 2]).normalized();
+
+    double xdotv = x.dot(v);
+    Eigen::Vector3d xcrossv = x.cross(v);
+
+    double f = pow((xdotv), 2) / a2 + pow(xcrossv.norm(), 2) / b2;
+    cost += f;
+
+    Eigen::Matrix3d m;
+    m << 0, -v(2), v(1), v(2), 0, -v(0), -v(1), v(0), 0;
+    Eigen::Vector3d df_dx = 2 * xdotv / a2 * v + 2 / b2 * m * xcrossv;
+
+    gradient.col(i - 1) += df_dx / 6;
+    gradient.col(i) += 4 * df_dx / 6;
+    gradient.col(i + 1) += df_dx / 6;
+  }
 }
 
 void BsplineOpt::calcCurvatureCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient)
 {
+  cost = 0.0;
+  int end_idx = q.cols() - order_;
+  for (auto i = order_+3; i < end_idx; ++i)
+  {
+    double x1 = q(0, i-3);double y1 = q(1, i-3);
+    double x2 = q(0, i-2);double y2 = q(1, i-2);
+    double x3 = q(0, i-1);double y3 = q(1, i-1);
+    double x4 = q(0,   i);double y4 = q(1,   i);
 
+    double dcx_t0 = -0.5*x1 + 0.5*x3;
+    double dcx_th = -0.125*x1-0.625*x2+0.875*x3+0.125*x4;
+    double dcy_t0 = -0.5*y1 + 0.5*y3;
+    double dcy_th = -0.125*y1-0.625*y2+0.875*y3+0.125*y4;
+    double ddcx_t0 = x1 - 2*x2 + x3;
+    double ddcx_th = 0.5*x1 - 0.5*x2 + 0.25*x3 + 0.5*x4;
+    double ddcy_t0 = y1 - 2*y2 + y3;
+    double ddcy_th = 0.5*y1 - 0.5*y2 + 0.25*y3 + 0.5*y4;
+    double squa_norm0 = dcx_t0*dcx_t0 + dcy_t0*dcy_t0;
+    double squa_normh = dcx_th*dcx_th + dcy_th*dcy_th;
+
+    double K0 = (dcx_t0*ddcy_t0 - ddcx_t0*dcy_t0)/sqrt(dcx_t0*dcx_t0 + dcy_t0*dcy_t0);
+    double Kh = (dcx_th*ddcy_th - ddcx_th*dcy_th)/sqrt(dcx_th*dcx_th + dcy_th*dcy_th);
+
+    double termx1, termx2, termy1, termy2;
+
+    if (K0>0 && K0>max_K_)
+    {
+      cost += K0 - max_K_;
+      termx1 = (ddcy_t0*pow(squa_norm0, 1.5)-3*(dcx_t0*ddcy_t0-ddcx_t0*dcy_t0)*squa_norm0*dcx_t0)/pow(squa_norm0, 3);
+      termx2 = -dcy_t0/pow(squa_norm0, 1.5);
+      termy1 = (-ddcx_t0*pow(squa_norm0, 1.5)-3*(dcx_t0*ddcy_t0-ddcx_t0*dcy_t0)*squa_norm0*dcy_t0)/pow(squa_norm0, 3);
+      termy2 = dcx_t0/pow(squa_norm0, 1.5);
+      gradient(0, i-3) += termx1*coc.pdcx_x10 + termx2*coc.pddcx_x10;
+      gradient(1, i-3) += termy1*coc.pdcx_x10 + termy2*coc.pddcx_x10;
+      gradient(0, i-2) += termx1*coc.pdcx_x20 + termx2*coc.pddcx_x20;
+      gradient(1, i-2) += termy1*coc.pdcx_x20 + termy2*coc.pddcx_x20;
+      gradient(0, i-1) += termx1*coc.pdcx_x30 + termx2*coc.pddcx_x30;
+      gradient(1, i-1) += termy1*coc.pdcx_x30 + termy2*coc.pddcx_x30;
+      gradient(0,   i) += termx1*coc.pdcx_x40 + termx2*coc.pddcx_x40;
+      gradient(1,   i) += termy1*coc.pdcx_x40 + termy2*coc.pddcx_x40;
+    }
+    else if (K0<0 && -K0>max_K_)
+    {
+      cost += -K0 - max_K_;
+      termx1 = (ddcy_t0*pow(squa_norm0, 1.5)-3*(dcx_t0*ddcy_t0-ddcx_t0*dcy_t0)*squa_norm0*dcx_t0)/pow(squa_norm0, 3);
+      termx2 = -dcy_t0/pow(squa_norm0, 1.5);
+      termy1 = (-ddcx_t0*pow(squa_norm0, 1.5)-3*(dcx_t0*ddcy_t0-ddcx_t0*dcy_t0)*squa_norm0*dcy_t0)/pow(squa_norm0, 3);
+      termy2 = dcx_t0/pow(squa_norm0, 1.5);
+      gradient(0, i-3) +=-termx1*coc.pdcx_x10 - termx2*coc.pddcx_x10;
+      gradient(1, i-3) +=-termy1*coc.pdcx_x10 - termy2*coc.pddcx_x10;
+      gradient(0, i-2) +=-termx1*coc.pdcx_x20 - termx2*coc.pddcx_x20;
+      gradient(1, i-2) +=-termy1*coc.pdcx_x20 - termy2*coc.pddcx_x20;
+      gradient(0, i-1) +=-termx1*coc.pdcx_x30 - termx2*coc.pddcx_x30;
+      gradient(1, i-1) +=-termy1*coc.pdcx_x30 - termy2*coc.pddcx_x30;
+      gradient(0,   i) +=-termx1*coc.pdcx_x40 - termx2*coc.pddcx_x40;
+      gradient(1,   i) +=-termy1*coc.pdcx_x40 - termy2*coc.pddcx_x40;
+    }
+    if (Kh>0 && Kh>max_K_)
+    {
+      cost += Kh - max_K_;
+      termx1 = (ddcy_th*pow(squa_normh, 1.5)-3*(dcx_th*ddcy_th-ddcx_th*dcy_th)*squa_normh*dcx_th)/pow(squa_normh, 3);
+      termx2 = -dcy_th/pow(squa_normh, 1.5);
+      termy1 = (-ddcx_th*pow(squa_normh, 1.5)-3*(dcx_th*ddcy_th-ddcx_th*dcy_th)*squa_normh*dcy_th)/pow(squa_normh, 3);
+      termy2 = dcx_th/pow(squa_normh, 1.5);
+      gradient(0, i-3) += termx1*coc.pdcx_x1h + termx2*coc.pddcx_x1h;
+      gradient(1, i-3) += termy1*coc.pdcx_x1h + termy2*coc.pddcx_x1h;
+      gradient(0, i-2) += termx1*coc.pdcx_x2h + termx2*coc.pddcx_x2h;
+      gradient(1, i-2) += termy1*coc.pdcx_x2h + termy2*coc.pddcx_x2h;
+      gradient(0, i-1) += termx1*coc.pdcx_x3h + termx2*coc.pddcx_x3h;
+      gradient(1, i-1) += termy1*coc.pdcx_x3h + termy2*coc.pddcx_x3h;
+      gradient(0,   i) += termx1*coc.pdcx_x4h + termx2*coc.pddcx_x4h;
+      gradient(1,   i) += termy1*coc.pdcx_x4h + termy2*coc.pddcx_x4h;
+    }
+    else if (Kh<0 && -Kh>max_K_)
+    {
+      cost += -Kh - max_K_;
+      termx1 = (ddcy_th*pow(squa_normh, 1.5)-3*(dcx_th*ddcy_th-ddcx_th*dcy_th)*squa_normh*dcx_th)/pow(squa_normh, 3);
+      termx2 = -dcy_th/pow(squa_normh, 1.5);
+      termy1 = (-ddcx_th*pow(squa_normh, 1.5)-3*(dcx_th*ddcy_th-ddcx_th*dcy_th)*squa_normh*dcy_th)/pow(squa_normh, 3);
+      termy2 = dcx_th/pow(squa_normh, 1.5);
+      gradient(0, i-3) +=-termx1*coc.pdcx_x1h - termx2*coc.pddcx_x1h;
+      gradient(1, i-3) +=-termy1*coc.pdcx_x1h - termy2*coc.pddcx_x1h;
+      gradient(0, i-2) +=-termx1*coc.pdcx_x2h - termx2*coc.pddcx_x2h;
+      gradient(1, i-2) +=-termy1*coc.pdcx_x2h - termy2*coc.pddcx_x2h;
+      gradient(0, i-1) +=-termx1*coc.pdcx_x3h - termx2*coc.pddcx_x3h;
+      gradient(1, i-1) +=-termy1*coc.pdcx_x3h - termy2*coc.pddcx_x3h;
+      gradient(0,   i) +=-termx1*coc.pdcx_x4h - termx2*coc.pddcx_x4h;
+      gradient(1,   i) +=-termy1*coc.pdcx_x4h - termy2*coc.pddcx_x4h;
+    }
+  }
 }
 
 void BsplineOpt::combineOptCost(const double *x, double *grad, double &f_combine, const int n)
@@ -604,7 +708,7 @@ void BsplineOpt::combineOptCost(const double *x, double *grad, double &f_combine
 
   memcpy(control_pts.data()+3*order_, x, n*sizeof(x[0]));
 
-  cout << control_pts << endl;
+  //cout << control_pts << endl;
   calcSmoothnessCost(control_pts, f_smoothness, g_smoothness);
   //printf("b\n");
   calcCollisionCost(control_pts, f_distance, g_distance);
@@ -619,7 +723,18 @@ void BsplineOpt::combineOptCost(const double *x, double *grad, double &f_combine
 
 void BsplineOpt::combineAdjCost(const double *x, double *grad, double &f_combine, const int n)
 {
+  double f_fitness, f_curvature;
 
+  Eigen::MatrixXd g_fitness = Eigen::MatrixXd::Zero(3, bspline.getControlPtSize());
+  Eigen::MatrixXd g_curvature = Eigen::MatrixXd::Zero(3, bspline.getControlPtSize());
+
+  memcpy(control_pts.data()+3*order_, x, n*sizeof(x[0]));
+  calcFitnessCost(control_pts, f_fitness, g_fitness);
+  calcCurvatureCost(control_pts, f_curvature, g_curvature);
+
+  f_combine = lambda5_*f_fitness + lambda4_*f_curvature;
+  Eigen::MatrixXd grad_3D = lambda5_*g_fitness + lambda4_*g_curvature;
+  memcpy(grad, grad_3D.data() + 3 * order_, n * sizeof(grad[0]));
 }
 
 int BsplineOpt::earlyExit(void *func_data, const double *x, const double *g, const double fx, const double xnorm, const double gnorm, const double step, int n, int k, int ls)
@@ -640,9 +755,19 @@ double BsplineOpt::costFunctionOpt(void *func_data, const double *x, double *gra
   return cost;
 }
 
+double BsplineOpt::costFunctionAdj(void *func_data, const double *x, double *grad, const int n)
+{
+  BsplineOpt *opt = reinterpret_cast<BsplineOpt *>(func_data);
+  double cost;
+  opt->combineAdjCost(x, grad, cost, n);
+
+  opt->iter_num_ += 1;
+  return cost;
+}
+
 bool BsplineOpt::optStage()
 {
-  printf("Start optimization stage\n");
+  //printf("Start optimization stage\n");
   iter_num_ = 0;
   int start_id = order_;
   int end_id = this->bspline.getControlPoint().cols() - order_;
@@ -725,6 +850,87 @@ bool BsplineOpt::optStage()
         initControlPoints(cps_.points, false);
         new_lambda2_ *= 2;
         */
+        printf("\033[32miter(+1)=%d,time(ms)=%5.3f,keep optimizing\n\033[0m", iter_num_, time_ms);
+      }
+    }
+    else if (result == lbfgs::LBFGSERR_CANCELED)
+    {
+      flag_force_return = true;
+      rebound_times++;
+      cout << "iter=" << iter_num_ << ",time(ms)=" << time_ms << ",rebound." << endl;
+    }
+    else
+    {
+      ROS_WARN("Solver error. Return = %d, %s. Skip this planning.", result, lbfgs::lbfgs_strerror(result));
+      // while (ros::ok());
+    }
+
+  } while ((flag_occ && restart_nums < MAX_RESART_NUMS_SET) ||
+            (flag_force_return && force_stop_type_ == STOP_FOR_REBOUND && rebound_times <= 20));
+
+  return success;
+}
+
+bool BsplineOpt::adjStage()
+{
+  //printf("Start optimization stage\n");
+  iter_num_ = 0;
+  int start_id = order_;
+  int end_id = this->bspline.getControlPoint().cols() - order_;
+  variable_num_ = 3 * (end_id - start_id);
+  double final_cost;
+  Eigen::MatrixXd ctrlpts = bspline.getControlPoint();
+  ref_pts_.clear();
+  for (int i=start_id;i<=end_id;i++)
+  {
+    ref_pts_.push_back(ctrlpts.col(i));
+  }
+
+  ros::Time t0 = ros::Time::now(), t1, t2;
+  int restart_nums = 0, rebound_times = 0;
+  ;
+  bool flag_force_return, flag_occ, success;
+  constexpr int MAX_RESART_NUMS_SET = 3;
+  do
+  {
+    /* ---------- prepare ---------- */
+    min_cost_ = std::numeric_limits<double>::max();
+    iter_num_ = 0;
+    flag_force_return = false;
+    flag_occ = false;
+    success = false;
+
+    double q[variable_num_];
+    memcpy(q, bspline.getControlPoint().data() + 3 * start_id, variable_num_ * sizeof(q[0]));
+
+    lbfgs::lbfgs_parameter_t lbfgs_params;
+    lbfgs::lbfgs_load_default_parameters(&lbfgs_params);
+    lbfgs_params.mem_size = 16;
+    lbfgs_params.max_iterations = 200;
+    lbfgs_params.g_epsilon = 0.01;
+
+    /* ---------- optimize ---------- */
+    t1 = ros::Time::now();
+    int result = lbfgs::lbfgs_optimize(variable_num_, q, &final_cost, BsplineOpt::costFunctionAdj, NULL, BsplineOpt::earlyExit, this, &lbfgs_params);
+    t2 = ros::Time::now();
+    double time_ms = (t2 - t1).toSec() * 1000;
+    double total_time_ms = (t2 - t0).toSec() * 1000;
+
+    /* ---------- success temporary, check collision again ---------- */
+    if (result == lbfgs::LBFGS_CONVERGENCE ||
+        result == lbfgs::LBFGSERR_MAXIMUMITERATION ||
+        result == lbfgs::LBFGS_ALREADY_MINIMIZED ||
+        result == lbfgs::LBFGS_STOP)
+    {
+      ROS_WARN("Solver error in planning!, return = %s", lbfgs::lbfgs_strerror(result));
+      flag_force_return = false;
+      if (!flag_occ)
+      {
+        printf("\033[32miter(+1)=%d,time(ms)=%5.3f,total_t(ms)=%5.3f,cost=%5.3f\n\033[0m", iter_num_, time_ms, total_time_ms, final_cost);
+        success = true;
+      }
+      else // restart
+      {
         printf("\033[32miter(+1)=%d,time(ms)=%5.3f,keep optimizing\n\033[0m", iter_num_, time_ms);
       }
     }
