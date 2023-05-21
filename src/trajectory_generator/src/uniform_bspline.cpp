@@ -438,7 +438,7 @@ bool BsplineOpt::set_bspline(std::vector<Eigen::Vector3d> A_Star_Path, std::vect
     count ++;
   }
   if (points_inv.size()<4) return false;
-  double ts = cp_dist_ / max_vel_ * 5;
+  double ts = cp_dist_ / max_vel_ * 3.5;
   bspline.parameterizeToBspline(ts,points_inv, start_target_derivative, control_points);
   bspline = UniformBspline(control_points, order_, ts);
   control_pts = bspline.get_control_points();

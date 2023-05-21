@@ -52,7 +52,7 @@ ros::NodeHandle* nh_ptr;
 
 // ros related
 ros::Subscriber _map_sub, _pts_sub, _odom_sub;
-ros::Publisher _traj_vis_pub, _traj_pub, _path_vis_pub;
+ros::Publisher _traj_vis_pub, _traj_pub, _path_vis_pub, _default_traj_pub;
 ros::Publisher bspline_pub;
 
 // for planning
@@ -337,7 +337,9 @@ bool trajGeneration() {
    * STEP 1:  search the path and get the path
    *
    * **/
+  ros::Time t1, t2;
   _astar_path_finder->resetUsedGrids();
+  t1 = ros::Time::now();
   _astar_path_finder->AstarGraphSearch(start_pt, target_pt);
   auto grid_path = _astar_path_finder->getPath();
   grid_path[0] = target_pt;
@@ -364,9 +366,17 @@ bool trajGeneration() {
     target_acc = start_target_derivative[3];
   }
   bool success_flag = bspline_opt.set_bspline(grid_path, start_target_derivative);
+  t2 = ros::Time::now();
+  printf("Bspline Init Time: %f\n", (t2-t1).toSec());
+  t1 = t2;
   if (!success_flag) return false;
   bspline_opt.optStage();
+  t2 = ros::Time::now();
+  printf("Bspline Opt Time: %f\n", (t2-t1).toSec());
+  t1 = t2;
   bspline_opt.adjStage();
+  t2 = ros::Time::now();
+  printf("Bspline Adj Time: %f\n", (t2-t1).toSec());
   UniformBspline bspline(bspline_opt.get_bspline());
   //std::cout<<bspline.get_control_points()<<std::endl;
   time_traj_start = ros::Time::now();
@@ -713,6 +723,7 @@ int main(int argc, char **argv) {
 
   _traj_pub =
       nh.advertise<quadrotor_msgs::PolynomialTrajectory>("trajectory", 50);
+  _default_traj_pub = nh.advertise<visualization_msgs::Marker>("default_path", 1);
   _traj_vis_pub = nh.advertise<visualization_msgs::Marker>("vis_trajectory", 1);
   _path_vis_pub = nh.advertise<visualization_msgs::Marker>("vis_path", 1);
   bspline_pub = nh.advertise<quadrotor_msgs::Bspline>("bspline_trajectory", 10);
