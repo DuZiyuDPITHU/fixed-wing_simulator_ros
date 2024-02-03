@@ -76,6 +76,7 @@ public:
   double getJerk();
   void getMeanAndMaxVel(double &mean_v, double &max_v);
   void getMeanAndMaxAcc(double &mean_a, double &max_a);
+  void setAllControlPoint(const double* new_pt, int n);
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };

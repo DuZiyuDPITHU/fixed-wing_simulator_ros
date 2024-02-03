@@ -66,7 +66,8 @@
         "typeindex": "cpp",
         "typeinfo": "cpp",
         "valarray": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "core": "cpp"
     },
     "python.autoComplete.extraPaths": [
         "/home/duziyu/Project/devel/lib/python3/dist-packages",

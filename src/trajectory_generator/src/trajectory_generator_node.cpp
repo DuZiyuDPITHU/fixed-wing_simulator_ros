@@ -37,22 +37,23 @@ double _resolution, _inv_resolution, _path_resolution;
 double _x_size, _y_size, _z_size;
 Vector3d _map_lower, _map_upper;
 int _max_x_id, _max_y_id, _max_z_id;
+int vis_traj_id = 0;
 
 // Param from launch file
 double _vis_traj_width;
 double _Vel, _Acc;
 int _dev_order, _min_order;
 double hovering_speed, hovering_radius;
+int if_2d_search;
+double h_reference;
 
-////////////////////////
 int num_cp;
 double dPI = 3.1415926535897;
 ros::NodeHandle* nh_ptr;
-////////////////////////
 
 // ros related
 ros::Subscriber _map_sub, _pts_sub, _odom_sub;
-ros::Publisher _traj_vis_pub, _traj_pub, _path_vis_pub, _default_traj_pub;
+ros::Publisher _traj_init_vis_pub, _traj_opt_vis_pub, _traj_vis_pub, _traj_pub, _path_vis_pub, _default_traj_pub;
 ros::Publisher bspline_pub;
 
 // for planning
@@ -88,9 +89,15 @@ ros::Timer _exec_timer;
 void execCallback(const ros::TimerEvent &e);
 
 // declare
+enum VIS_TYPE {
+  VIS_INIT, 
+  VIS_OPT, 
+  VIS_TRAJ
+} vis_type;
+
 void changeState(STATE new_state, string pos_call);
 void printState();
-void visTrajectory(bool if_default);
+void visTrajectory(bool if_default, VIS_TYPE vis_type);
 void visPath(MatrixXd nodes);
 void trajOptimization(Eigen::MatrixXd path);
 void rcvOdomCallback(const nav_msgs::Odometry::ConstPtr &odom);
@@ -167,7 +174,7 @@ void execCallback(const ros::TimerEvent &e) {
       {
         time_hovering_start = ros::Time::now();
         bspline_traj_pub(&default_traj);
-        visTrajectory(true);
+        visTrajectory(true, VIS_TRAJ);
         hovering_pub_count++;
         return;
       }
@@ -235,6 +242,7 @@ void execCallback(const ros::TimerEvent &e) {
     //start_pt = getPos(t_cur);
     //start_vel = getVel(t_cur);
     start_pt = cur_bspline_traj.evaluateDeBoorT(t_cur);
+    if (if_2d_search == 1) start_pt(2) = h_reference;
     start_vel = cur_bspline_vel.evaluateDeBoorT(t_cur);
     start_acc = cur_bspline_acc.evaluateDeBoorT(t_cur);
     //std::cout<< "current time: " << t_cur << std::endl << start_pt.transpose() << std::endl;
@@ -252,10 +260,13 @@ void execCallback(const ros::TimerEvent &e) {
 void rcvWaypointsCallBack(const nav_msgs::Path &wp) {
   if (wp.poses[0].pose.position.z < 0.0)
     return;
-  target_pt << wp.poses[0].pose.position.x, wp.poses[0].pose.position.y,
-      wp.poses[0].pose.position.z;
+  //target_pt << wp.poses[0].pose.position.x, wp.poses[0].pose.position.y,
+  //    wp.poses[0].pose.position.z;
+  target_pt << 255.0, 0.0, 0.000;
+  if (if_2d_search == 1) target_pt(2) = h_reference;
   ROS_INFO("[node] receive the planning target");
   start_pt = odom_pt;
+  if (if_2d_search == 1) start_pt(2) = h_reference;
   start_vel = odom_vel;
   has_target = true;
 
@@ -273,7 +284,7 @@ void rcvWaypointsCallBack(const nav_msgs::Path &wp) {
     }
   }
   else if (exec_state == EXEC_TRAJ){
-    printf("replan due to rcv waypoint\n");
+    //printf("replan due to rcv waypoint\n");
     changeState(REPLAN_TRAJ, "STATE");}
 }
 
@@ -334,20 +345,20 @@ void rcvPointCloudCallBack(const sensor_msgs::PointCloud2 &pointcloud_map) {
 bool trajGeneration() {
   /**
    *
-   * STEP 1:  search the path and get the path
+   * STEP 1:  search A* path and initialize bspline traj 
    *
    * **/
   ros::Time t1, t2;
   _astar_path_finder->resetUsedGrids();
   t1 = ros::Time::now();
-  _astar_path_finder->AstarGraphSearch(start_pt, target_pt);
+  _astar_path_finder->AstarGraphSearch(start_pt, target_pt, if_2d_search);
   auto grid_path = _astar_path_finder->getPath();
   grid_path[0] = target_pt;
   grid_path[grid_path.size()-1] = start_pt;
   BsplineOpt bspline_opt;
   bspline_opt.set_param(nh_ptr, _astar_path_finder);
-  vector<Vector3d> start_target_derivative;
 
+  vector<Vector3d> start_target_derivative;
   start_target_derivative.push_back(start_vel);
   if (has_default) start_target_derivative.push_back(target_vel);
   else 
@@ -365,18 +376,37 @@ bool trajGeneration() {
     start_target_derivative.push_back(hovering_speed*hovering_speed/hovering_radius*zRotate(start_target_derivative[1].normalized(), -dPI/2));
     target_acc = start_target_derivative[3];
   }
+
   bool success_flag = bspline_opt.set_bspline(grid_path, start_target_derivative);
+  cur_bspline_traj = bspline_opt.get_bspline();
+  visTrajectory(false, VIS_INIT);
+  /**
+   *
+   * STEP 2:  optimize traj
+   *
+   * **/
   t2 = ros::Time::now();
-  printf("Bspline Init Time: %f\n", (t2-t1).toSec());
+
+  double init_time = (t2-t1).toSec();
   t1 = t2;
   if (!success_flag) return false;
   bspline_opt.optStage();
   t2 = ros::Time::now();
-  printf("Bspline Opt Time: %f\n", (t2-t1).toSec());
+  cur_bspline_traj = bspline_opt.get_bspline();
+  visTrajectory(false, VIS_OPT);
+  double opt_time = (t2-t1).toSec();
+  
+  /**
+   *
+   * STEP 3:  Trajectory optimization
+   *
+   * **/
   t1 = t2;
   bspline_opt.adjStage();
   t2 = ros::Time::now();
-  printf("Bspline Adj Time: %f\n", (t2-t1).toSec());
+
+  double adj_time = (t2-t1).toSec();
+  printf("Init Opt Adj Time: %f, %f, %f\n", init_time, opt_time, adj_time);
   UniformBspline bspline(bspline_opt.get_bspline());
   //std::cout<<bspline.get_control_points()<<std::endl;
   time_traj_start = ros::Time::now();
@@ -385,7 +415,7 @@ bool trajGeneration() {
   cur_bspline_traj = bspline;
   cur_bspline_vel = cur_bspline_traj.getDerivative();
   cur_bspline_acc = cur_bspline_vel.getDerivative();
-  visTrajectory(false);
+  visTrajectory(false, VIS_TRAJ);
   if (cur_bspline_traj.get_control_points().cols() > 2)
   {
     defaultTrajGeneration();
@@ -394,42 +424,8 @@ bool trajGeneration() {
     default_acc = default_vel.getDerivative();
     has_default = true;
   }
-  printf("Get A* path\n");
-  // Reset map for next call
 
-  /**
-   *
-   * STEP 2:  Simplify the path: use the RDP algorithm
-   *
-   * **/
-  /*
-  grid_path = _astar_path_finder->pathSimplify(grid_path, _path_resolution);
-  MatrixXd path(int(grid_path.size()), 3);
-  for (int k = 0; k < int(grid_path.size()); k++) {
-    path.row(k) = grid_path[k];
-  }
-  printf("Simplify A* traj.\n");
-  */
   return true;
-  /**
-   *
-   * STEP 3:  Trajectory optimization
-   *
-   * **/
-  /*
-  trajOptimization(path);
-  time_duration = _polyTime.sum();
-
-  // Publish the trajectory
-  trajPublish(_polyCoeff, _polyTime);
-  // record the trajectory start time
-  time_traj_start = ros::Time::now();
-  // return if the trajectory generation successes
-  if (_polyCoeff.rows() > 0)
-    return true;
-  else
-    return false;
-    */
 }
 
 /*
@@ -555,9 +551,7 @@ void trajPublish(MatrixXd polyCoeff, VectorXd time) {
   traj_msg.final_yaw = atan2(finalVel(1), finalVel(0));
 
   poly_number = traj_msg.num_order + 1;
-  // cout << "p_order:" << poly_number << endl;
-  // cout << "traj_msg.num_order:" << traj_msg.num_order << endl;
-  // cout << "traj_msg.num_segment:" << traj_msg.num_segment << endl;
+
   for (unsigned int i = 0; i < traj_msg.num_segment; i++) {
     for (unsigned int j = 0; j < poly_number; j++) {
       traj_msg.coef_x.push_back(polyCoeff(i, j) * pow(time(i), j));
@@ -568,7 +562,9 @@ void trajPublish(MatrixXd polyCoeff, VectorXd time) {
     }
     traj_msg.time.push_back(time(i));
     traj_msg.order.push_back(traj_msg.num_order);
-  }
+  }  // cout << "p_order:" << poly_number << endl;
+  // cout << "traj_msg.num_order:" << traj_msg.num_order << endl;
+  // cout << "traj_msg.num_segment:" << traj_msg.num_segment << endl;
   traj_msg.mag_coeff = 1;
 
   count++;
@@ -582,28 +578,56 @@ VectorXd timeAllocation(MatrixXd Path) {
   return time;
 }
 
-void visTrajectory(bool if_default) {
+void visTrajectory(bool if_default, VIS_TYPE vis_type) {
   visualization_msgs::Marker _traj_vis;
 
   _traj_vis.header.stamp = ros::Time::now();
   _traj_vis.header.frame_id = "world";
 
   _traj_vis.ns = "traj_node/trajectory";
+  //_traj_vis.id = vis_traj_id;
   _traj_vis.id = 0;
-  _traj_vis.type = visualization_msgs::Marker::SPHERE_LIST;
+  vis_traj_id++;
+  _traj_vis.type = visualization_msgs::Marker::LINE_STRIP;
   _traj_vis.action = visualization_msgs::Marker::ADD;
-  _traj_vis.scale.x = _vis_traj_width;
-  _traj_vis.scale.y = _vis_traj_width;
-  _traj_vis.scale.z = _vis_traj_width;
+  
   _traj_vis.pose.orientation.x = 0.0;
   _traj_vis.pose.orientation.y = 0.0;
   _traj_vis.pose.orientation.z = 0.0;
   _traj_vis.pose.orientation.w = 1.0;
 
-  _traj_vis.color.a = 1.0;
-  _traj_vis.color.r = 0.0;
-  _traj_vis.color.g = 0.5;
-  _traj_vis.color.b = 1.0;
+  if (vis_type == VIS_TRAJ)
+  {
+    _traj_vis.scale.x = _vis_traj_width;
+    _traj_vis.scale.y = _vis_traj_width;
+    _traj_vis.scale.z = _vis_traj_width;
+    
+    _traj_vis.color.a = 0.9;
+    _traj_vis.color.r = 0.5373;
+    _traj_vis.color.g = 0.5137;
+    _traj_vis.color.b = 0.7490;
+  } else if (vis_type == VIS_OPT)
+  {
+    _traj_vis.scale.x = _vis_traj_width*0.5;
+    _traj_vis.scale.y = _vis_traj_width*0.5;
+    _traj_vis.scale.z = _vis_traj_width*0.5;
+    
+    _traj_vis.color.a = 1.0;
+    _traj_vis.color.r = 0.0;
+    _traj_vis.color.g = 0.5;
+    _traj_vis.color.b = 1.0;
+  } else if (vis_type == VIS_INIT)
+  {
+    _traj_vis.scale.x = _vis_traj_width*0.5;
+    _traj_vis.scale.y = _vis_traj_width*0.5;
+    _traj_vis.scale.z = _vis_traj_width*0.5;
+    _traj_vis.color.a = 0.9;
+    _traj_vis.color.r = 0.3294;
+    _traj_vis.color.g = 0.7020;
+    _traj_vis.color.b = 0.2706;
+  }
+
+  //_traj_vis.lifetime = ros::Duration(0.0);
 
   _traj_vis.points.clear();
   Vector3d pos;
@@ -626,7 +650,12 @@ void visTrajectory(bool if_default) {
     pt.z = pos(2);
     _traj_vis.points.push_back(pt);
   }
-  _traj_vis_pub.publish(_traj_vis);
+  if (vis_type == VIS_TRAJ)
+    _traj_vis_pub.publish(_traj_vis);
+  else if (vis_type == VIS_OPT)
+    _traj_opt_vis_pub.publish(_traj_vis);
+  else if (vis_type == VIS_INIT)
+    _traj_init_vis_pub.publish(_traj_vis);
 }
 
 void visPath(MatrixXd nodes) {
@@ -711,6 +740,8 @@ int main(int argc, char **argv) {
   nh.param("replanning/thresh_no_replan", no_replan_thresh, -1.0);
   nh.param("hovering_speed", hovering_speed, 3.0);
   nh.param("hovering_radius", hovering_radius, 3.0);
+  nh.param("planning/if_2d_search", if_2d_search, 1);
+  nh.param("planning/h_reference", h_reference, 15.0);
   num_cp = 40;
 
   _poly_num1D = 2 * _dev_order;
@@ -724,6 +755,8 @@ int main(int argc, char **argv) {
   _traj_pub =
       nh.advertise<quadrotor_msgs::PolynomialTrajectory>("trajectory", 50);
   _default_traj_pub = nh.advertise<visualization_msgs::Marker>("default_path", 1);
+  _traj_init_vis_pub = nh.advertise<visualization_msgs::Marker>("vis_init_trajectory", 1);
+  _traj_opt_vis_pub = nh.advertise<visualization_msgs::Marker>("vis_opt_trajectory", 1);
   _traj_vis_pub = nh.advertise<visualization_msgs::Marker>("vis_trajectory", 1);
   _path_vis_pub = nh.advertise<visualization_msgs::Marker>("vis_path", 1);
   bspline_pub = nh.advertise<quadrotor_msgs::Bspline>("bspline_trajectory", 10);

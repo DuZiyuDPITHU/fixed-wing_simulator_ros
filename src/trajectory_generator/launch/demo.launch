@@ -1,15 +1,15 @@
 <launch>
 
-<arg name="map_size_x" default="200.0"/>
-<arg name="map_size_y" default="200.0"/>
-<arg name="map_size_z" default="15.0"/>
+<arg name="map_size_x" default="600.0"/>
+<arg name="map_size_y" default="100.0"/>
+<arg name="map_size_z" default="30.0"/>
 <arg name="map_frame_name"  default="world"/>
 
-<arg name="start_x" default=" -15.0"/>
+<arg name="start_x" default=" -260.0"/>
 <arg name="start_y" default=" 0.0"/>
-<arg name="start_z" default=" 8.0"/>
+<arg name="start_z" default=" 16.0"/>
 
-<arg name="sensing_horizon"  default="20.0" />
+<arg name="sensing_horizon"  default="50.0" />
 <arg name="sensing_rate"     default="20.0"/>
 <arg name="estimation_rate"  default="20.0"/>
 
@@ -19,35 +19,39 @@
       <remap from="~local_pointcloud" to="/pcl_render_node/local_pointcloud"/> 
       <remap from="~odom"             to="/visual_slam/odom"/>
       
+      
+      <param name="planning/if_2d_search"       value="1"    />
+      <param name="planning/h_reference"        value="15.0" />
       <param name="planning/vel"                value="3.0"  />
       <param name="planning/acc"                value="2.0"  />
       <param name="planning/dev_order"          value="4"    />
       <param name="planning/min_order"          value="3"    />
-      <param name="vis/vis_traj_width"          value="0.4" />
+      <param name="vis/vis_traj_width"          value="0.5" />
       <param name="map/margin"                  value="0.0" />
       <param name="map/resolution"              value="2.0" />
       <param name="map/x_size"                  value="$(arg map_size_x)"/>
       <param name="map/y_size"                  value="$(arg map_size_y)"/>
       <param name="map/z_size"                  value="$(arg map_size_z)"/>
-      <param name="replanning/thresh_replan"    value="1.0" type="double"/>
-      <param name="replanning/thresh_no_replan" value="8.0" type="double"/>
+      <param name="replanning/thresh_replan"    value="5.0" type="double"/>
+      <param name="replanning/thresh_no_replan" value="15.0" type="double"/>
       <param name="path/resolution"             value="0.2"/>
+      <param name="traj_server/time_forward"    value="0.3"/>
       
-      <param name="optimization/lambda_smooth" value="12.0" type="double"/>
-      <param name="optimization/lambda_collision" value="16" type="double"/>
-      <param name="optimization/lambda_feasibility" value="32" type="double"/>
-      <param name="optimization/lambda_curvature" value="16" type="double"/>
-      <param name="optimization/lambda_fitness" value="8" type="double"/>
+      <param name="optimization/lambda_smooth" value="2.0" type="double"/>
+      <param name="optimization/lambda_collision" value="0.76" type="double"/>
+      <param name="optimization/lambda_feasibility" value="0.04" type="double"/>
+      <param name="optimization/lambda_curvature" value="1" type="double"/>
+      <param name="optimization/lambda_fitness" value="0.00" type="double"/>
       <param name="optimization/dist0" value="8.0" type="double"/>
-      <param name="optimization/max_vel" value="10.0" type="double"/>
+      <param name="optimization/max_vel" value="12.0" type="double"/>
       <param name="optimization/min_vel" value="8.0" type="double"/>
-      <param name="optimization/max_K" value="0.1" type="double"/>
+      <param name="optimization/max_K" value="0.00" type="double"/>    <!--<param name="map/random_seed" value="40.0"/>-->     
       <param name="optimization/max_acc" value="12.0" type="double"/>
       <param name="optimization/order_" value="3" type="int"/>
-      <param name="optimization/control_points_distance" value="2.0" type="double"/>
+      <param name="optimization/control_points_distance" value="4.0" type="double"/>
 
       <param name="hovering_speed" value="6.0" type="double"/>
-      <param name="hovering_radius" value="6.0" type="double"/>
+      <param name="hovering_radius" value="20.0" type="double"/>
 
   </node>
 
@@ -70,17 +74,19 @@
     <param name="map_frame_name"      value="$(arg map_frame_name)"/>
 
     <param name="map/circle_num" value="0"/>        
-    <param name="map/obs_num"    value="80"/>        
-    <param name="map/resolution" value="0.4"/>     
+    <param name="map/obs_num"    value="66"/>        
+    <param name="map/resolution" value="1"/> 
+    <param name="map/random_seed" value="140.0"/>
+ 
 
     <param name="ObstacleShape/lower_rad" value="4"/>
-    <param name="ObstacleShape/upper_rad" value="6"/>
-    <param name="ObstacleShape/lower_hei" value="5.0"/>
-    <param name="ObstacleShape/upper_hei" value="6.0"/>
+    <param name="ObstacleShape/upper_rad" value="8"/>
+    <param name="ObstacleShape/lower_hei" value="10.0"/>
+    <param name="ObstacleShape/upper_hei" value="20.0"/>
     <param name="CircleShape/lower_circle_rad"   value="0.6"/>        
     <param name="CircleShape/upper_circle_rad"   value="3.5"/>        
     
-    <param name="sensing/rate"   value="2.0"/>        
+    <param name="sensing/rate"   value="2.0"/>       
 </node>
 
 <!-- Map Info Render -->
@@ -98,7 +104,7 @@
     <remap from="~local_map"        to="/click_obstacle_generation/click_new_obs"/>
     <remap from="~odometry"         to="/visual_slam/odom"/>
 </node>
-
+  <![CDATA[
    <!-- Quadrotor Simulator -->
    <node pkg="so3_quadrotor_simulator" type="quadrotor_simulator_so3" name="quadrotor_simulator_so3" output="screen">
      <param name="rate/odom" value="100.0"/>
@@ -110,7 +116,22 @@
      <remap from="~cmd" to="so3_cmd"/>
      <remap from="~imu" to="sim/imu"/>     
    </node>
- 
+  ]]>
+   <!-- Fixed-wing Controller -->
+    <rosparam command="load" file="$(find dynamics)/param/plane_params.yaml" />
+    <rosparam command="load" file="$(find autopilot)/param/control_params.yaml" />
+    
+    <node pkg="dynamics" type="dynamics" name="dynamics" output="screen" />
+
+    <node pkg="estimator" type="ekf" name="ekf" output="screen" />
+      <param name="odom_rate" value="100.0"/>
+      <remap from="odom" to="/visual_slam/odom"/>
+
+    <node pkg="autopilot" type="autopilot" name="autopilot" output="screen" />
+
+    <node pkg="dynamics" type="windsim" name="wind" output="screen" />
+      <remap from="odom"            to="/visual_slam/odom"/>
+    <![CDATA[
    <!-- Quadrotor Controller -->  
    <node pkg="nodelet" type="nodelet" args="standalone so3_control/SO3ControlNodelet" name="so3_control" required="true" output="screen">
      <remap from="~odom"          to="/visual_slam/odom"/>
@@ -128,16 +149,17 @@
      <param name="gains/rot/z"            value="1.0"/>    
      <param name="gains/ang/z"            value="0.1"/>        
    </node> 
- 
+    ]]>
    <!-- Odom Visualization -->
    <node pkg="odom_visualization" name="odom_visualization" type="odom_visualization" output="screen">
      <remap from="~odom"            to="/visual_slam/odom"/>
      <param name="color/a"          value="0.8"/>    
-     <param name="color/r"          value="0.0"/>        
-     <param name="color/g"          value="1.0"/>        
-     <param name="color/b"          value="1.0"/>       
+     <param name="color/r"          value="1.0"/>        
+     <param name="color/g"          value="0.50"/>        
+     <param name="color/b"          value="0.25"/>       
      <param name="covariance_scale" value="100.0"/>
-     <param name="drone_scale"      value="0.8"/>       
+     <param name="drone_scale"      value="0.5"/> 
+     <param name="cross_config"      value="true"/>       
    </node>
 
   <!-- Set the goal -->

@@ -55,6 +55,7 @@ private:
   bool            enable_motors_;
   bool            use_external_yaw_;
   double          kR_[3], kOm_[3], corrections_[3];
+  double          kp_chi, ki_chi;
 };
 
 void
@@ -196,6 +197,7 @@ SO3ControlNodelet::onInit(void)
   n.param("corrections/z", corrections_[0], 0.0);
   n.param("corrections/r", corrections_[1], 0.0);
   n.param("corrections/p", corrections_[2], 0.0);
+
 
   so3_command_pub_ = n.advertise<quadrotor_msgs::SO3Command>("so3_cmd", 10);
 

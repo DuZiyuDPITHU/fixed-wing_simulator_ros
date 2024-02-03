@@ -17,6 +17,8 @@ using namespace std;
 
 static  string mesh_resource;
 static double color_r, color_g, color_b, color_a, cov_scale, scale;
+int id_count = 0, cmd_id_count = 0, mesh_id_count = 0;
+double traj_len = 0;
 
 bool   cross_config = false;
 bool   tf45       = false;
@@ -25,7 +27,11 @@ bool   cov_vel    = false;
 bool   cov_color  = false;
 bool   origin       = false;
 bool   isOriginSet  = false;
+bool   if_first_odom= true;
+bool   if_first_cmd = true;
 colvec poseOrigin(6);
+colvec last_pose(6);
+colvec last_cmd(6);
 ros::Publisher posePub;
 ros::Publisher pathPub;
 ros::Publisher velPub;
@@ -34,6 +40,8 @@ ros::Publisher covVelPub;
 ros::Publisher trajPub;
 ros::Publisher sensorPub;
 ros::Publisher meshPub;
+ros::Publisher trueStatePub;
+ros::Publisher cmdPub;
 ros::Publisher heightPub;
 tf::TransformBroadcaster* broadcaster;
 geometry_msgs::PoseStamped poseROS;
@@ -44,11 +52,71 @@ visualization_msgs::Marker covVelROS;
 visualization_msgs::Marker trajROS;
 visualization_msgs::Marker sensorROS;
 visualization_msgs::Marker meshROS;
+visualization_msgs::Marker trueState;
+visualization_msgs::Marker vis_cmd;
 sensor_msgs::Range         heightROS;
 string _frame_id;
+ros::Time t1, t2;
+ros::Time t3, t4;
+ros::Time t_start;
+
+void pos_cmd_callback(const quadrotor_msgs::PositionCommand::ConstPtr& cmd)
+{
+  /*
+  vis_cmd.header.frame_id = _frame_id;
+  vis_cmd.header.stamp = cmd->header.stamp;
+  vis_cmd.ns = "vis_pos_cmd";
+  vis_cmd.id = cmd_id_count;
+  vis_cmd.lifetime = ros::Duration(0.0);
+  cmd_id_count ++;
+  vis_cmd.type = 4;
+  vis_cmd.action = visualization_msgs::Marker::ADD;
+  vis_cmd.points.clear();
+  colvec pose(6);  
+  pose(0) = cmd->position.x;
+  pose(1) = cmd->position.y;
+  pose(2) = cmd->position.z;
+  geometry_msgs::Point pt;
+  if (if_first_cmd)
+  {
+    pt.x = pose(0);
+    pt.y = pose(1);
+    pt.z = pose(2);
+    vis_cmd.points.push_back(pt);
+    vis_cmd.points.push_back(pt);
+    last_cmd = pose;
+    if_first_cmd = false;
+  }
+  else
+  {
+    pt.x = last_cmd(0);
+    pt.y = last_cmd(1);
+    pt.z = last_cmd(2);
+    vis_cmd.points.push_back(pt);
+    pt.x = pose(0);
+    pt.y = pose(1);
+    pt.z = pose(2);
+    vis_cmd.points.push_back(pt);
+    last_cmd = pose;
+  }
+  vis_cmd.pose.orientation.w = 1.0;
+  vis_cmd.pose.orientation.x = 0.0;
+  vis_cmd.pose.orientation.y = 0.0;
+  vis_cmd.pose.orientation.z = 0.0;
+  vis_cmd.scale.x = 0.3;
+  vis_cmd.scale.y = 0.3;
+  vis_cmd.scale.z = 0.3;
+  vis_cmd.color.a = 1.0;
+  vis_cmd.color.r = 1.0;
+  vis_cmd.color.g = 1.0;
+  vis_cmd.color.b = 0.0;
+  cmdPub.publish(vis_cmd);
+  */
+}
 
 void odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
 {
+  t2 = ros::Time::now();
   if (msg->header.frame_id == string("null"))
     return;
   colvec pose(6);  
@@ -90,8 +158,105 @@ void odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
   poseROS.pose.orientation.x = q(1);
   poseROS.pose.orientation.y = q(2);
   poseROS.pose.orientation.z = q(3);      
-  posePub.publish(poseROS);
+  posePub.publish(poseROS); 
+
+  // Mesh model                                                  
+  meshROS.header.frame_id = _frame_id;
+  meshROS.header.stamp = msg->header.stamp; 
+  meshROS.ns = "mesh";
+  meshROS.id = 0;
+  t4 = ros::Time::now();
+  if ((t4-t3).toSec() > 13.0)
+  {
+    //meshROS.id = mesh_id_count;
+    meshROS.id = 0;
+    mesh_id_count++;
+    meshROS.lifetime = ros::Duration(0.0);
+    t3 = t4;
+  }
+  meshROS.type = visualization_msgs::Marker::MESH_RESOURCE;
+  meshROS.action = visualization_msgs::Marker::ADD;
+  meshROS.pose.position.x = pose(0);
+  meshROS.pose.position.y = pose(1);
+  meshROS.pose.position.z = pose(2);
+  colvec q_(4);
+  //q_ = R_to_quaternion(ypr_to_R(pose.rows(3,5)));
+  if (cross_config)
+  { 
+    mat A = zeros<mat>(3,3);
+    A(0, 0) = 0; A(0, 1) = 0; A(0, 2) = 1; 
+    A(1, 0) = 1; A(1, 1) = 0; A(1, 2) = 0; 
+    A(2, 0) = 0; A(2, 1) = 1; A(2, 2) = 0; 
+    q_ = R_to_quaternion(ypr_to_R(pose.rows(3,5))*A);
+  } 
+  meshROS.pose.orientation.w = q_(0);
+  meshROS.pose.orientation.x = q_(1);
+  meshROS.pose.orientation.y = q_(2);
+  meshROS.pose.orientation.z = q_(3);
+  meshROS.scale.x = scale;
+  meshROS.scale.y = scale;
+  meshROS.scale.z = scale;
+  meshROS.color.a = color_a;
+  meshROS.color.r = color_r;
+  meshROS.color.g = color_g;
+  meshROS.color.b = color_b;
+  meshROS.mesh_resource = mesh_resource;
+  meshPub.publish(meshROS);  
   
+  // TrueState
+  if((t2-t1).toSec() > 0.05)
+  {
+    trueState.header.frame_id = _frame_id;
+    trueState.header.stamp = msg->header.stamp;
+    trueState.ns = "true_state";
+    trueState.id = id_count;
+    trueState.lifetime = ros::Duration(0.0);
+    id_count ++;
+    trueState.type = 4;
+    trueState.action = visualization_msgs::Marker::ADD;
+
+    trueState.points.clear();
+    geometry_msgs::Point pt;
+    if (if_first_odom)
+    {
+      pt.x = pose(0);
+      pt.y = pose(1);
+      pt.z = pose(2);
+      trueState.points.push_back(pt);
+      trueState.points.push_back(pt);
+      last_pose = pose;
+      t_start = ros::Time::now();
+      if_first_odom = false;
+    }
+    else
+    {
+      pt.x = last_pose(0);
+      pt.y = last_pose(1);
+      pt.z = last_pose(2);
+      trueState.points.push_back(pt);
+      pt.x = pose(0);
+      pt.y = pose(1);
+      pt.z = pose(2);
+      //printf("pt_x: %f, pt_y: %f, pt_z: %f\n", pose(0), pose(1), pose(2));
+      traj_len += sqrt((last_pose(0)-pose(0))*(last_pose(0)-pose(0))+(last_pose(1)-pose(1))*(last_pose(1)-pose(1))+(last_pose(2)-pose(2))*(last_pose(2)-pose(2)));
+      //printf("time: %f, traj_len: %f", (ros::Time::now()-t_start).toSec(), traj_len);
+      trueState.points.push_back(pt);
+      last_pose = pose;
+    }
+    trueState.pose.orientation.w = 1.0;
+    trueState.pose.orientation.x = 0.0;
+    trueState.pose.orientation.y = 0.0;
+    trueState.pose.orientation.z = 0.0;
+    trueState.scale.x = 1.0;
+    trueState.scale.y = 1.0;
+    trueState.scale.z = 1.0;
+    trueState.color.a = 1.0;
+    trueState.color.r = 1.0;
+    trueState.color.g = 0.0;
+    trueState.color.b = 0.0;
+    trueStatePub.publish(trueState);
+    t1 = t2;
+  }
   // Velocity
   colvec yprVel(3);
   yprVel(0) =  atan2(vel(1), vel(0));
@@ -320,40 +485,7 @@ void odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
   heightROS.max_range =  100;
   heightROS.range     =  H; 
   heightPub.publish(heightROS);
-
-  // Mesh model                                                  
-  meshROS.header.frame_id = _frame_id;
-  meshROS.header.stamp = msg->header.stamp; 
-  meshROS.ns = "mesh";
-  meshROS.id = 0;
-  meshROS.type = visualization_msgs::Marker::MESH_RESOURCE;
-  meshROS.action = visualization_msgs::Marker::ADD;
-  meshROS.pose.position.x = msg->pose.pose.position.x;
-  meshROS.pose.position.y = msg->pose.pose.position.y;
-  meshROS.pose.position.z = msg->pose.pose.position.z;
-  q(0) = msg->pose.pose.orientation.w;
-  q(1) = msg->pose.pose.orientation.x;
-  q(2) = msg->pose.pose.orientation.y;
-  q(3) = msg->pose.pose.orientation.z;
-  if (cross_config)
-  {
-    colvec ypr = R_to_ypr(quaternion_to_R(q));
-    ypr(0)    += 45.0*PI/180.0;
-    q          = R_to_quaternion(ypr_to_R(ypr)); 
-  }  
-  meshROS.pose.orientation.w = q(0);
-  meshROS.pose.orientation.x = q(1);
-  meshROS.pose.orientation.y = q(2);
-  meshROS.pose.orientation.z = q(3);
-  meshROS.scale.x = scale;
-  meshROS.scale.y = scale;
-  meshROS.scale.z = scale;
-  meshROS.color.a = color_a;
-  meshROS.color.r = color_r;
-  meshROS.color.g = color_g;
-  meshROS.color.b = color_b;
-  meshROS.mesh_resource = mesh_resource;
-  meshPub.publish(meshROS);                                                  
+                                                
 
   // TF for raw sensor visualization
   if (tf45)
@@ -376,10 +508,10 @@ void odom_callback(const nav_msgs::Odometry::ConstPtr& msg)
     colvec q90 = R_to_quaternion(ypr_to_R(p90));  
     transform90.setRotation(tf::Quaternion(q90(1), q90(2), q90(3), q90(0)));  
 
-    broadcaster->sendTransform(tf::StampedTransform(transform,   msg->header.stamp, string("world"),  string("/base")));      
-    broadcaster->sendTransform(tf::StampedTransform(transform45, msg->header.stamp, string("/base"), string("/laser")));          
-    broadcaster->sendTransform(tf::StampedTransform(transform45, msg->header.stamp, string("/base"), string("/vision")));          
-    broadcaster->sendTransform(tf::StampedTransform(transform90, msg->header.stamp, string("/base"), string("/height")));          
+    broadcaster->sendTransform(tf::StampedTransform(transform,   ros::Time::now(), string("world"),  string("/base")));      
+    broadcaster->sendTransform(tf::StampedTransform(transform45, ros::Time::now(), string("/base"), string("/laser")));          
+    broadcaster->sendTransform(tf::StampedTransform(transform45, ros::Time::now(), string("/base"), string("/vision")));          
+    broadcaster->sendTransform(tf::StampedTransform(transform90, ros::Time::now(), string("/base"), string("/height")));          
   } 
 }
 
@@ -435,8 +567,11 @@ int main(int argc, char** argv)
 {
   ros::init(argc, argv, "odom_visualization");
   ros::NodeHandle n("~");
+  t1 = ros::Time::now();
+  t3 = ros::Time::now();
 
-  n.param("mesh_resource", mesh_resource, std::string("package://odom_visualization/meshes/hummingbird.mesh"));
+  //n.param("mesh_resource", mesh_resource, std::string("package://odom_visualization/meshes/hummingbird.mesh"));
+  n.param("mesh_resource", mesh_resource, std::string("package://odom_visualization/meshes/Cirrus.obj"));
   n.param("color/r", color_r, 1.0);
   n.param("color/g", color_g, 0.0);
   n.param("color/b", color_b, 0.0);
@@ -446,7 +581,7 @@ int main(int argc, char** argv)
   n.param("frame_id",   _frame_id, string("world") );    
  
   n.param("cross_config", cross_config, false);    
-  n.param("tf45", tf45, false);    
+  n.param("tf45", tf45, true);    
   n.param("covariance_scale",    cov_scale,  100.0);
   n.param("covariance_position", cov_pos,    false);    
   n.param("covariance_velocity", cov_vel,    false);    
@@ -454,6 +589,7 @@ int main(int argc, char** argv)
   
   ros::Subscriber sub_odom = n.subscribe("odom", 100,  odom_callback);
   ros::Subscriber sub_cmd  = n.subscribe("cmd",  100,  cmd_callback);
+  ros::Subscriber position_cmd_sub_= n.subscribe("/pos_cmd", 10, pos_cmd_callback);
   posePub   = n.advertise<geometry_msgs::PoseStamped>("pose",                100, true);
   pathPub   = n.advertise<nav_msgs::Path>(            "path",                100, true);
   velPub    = n.advertise<visualization_msgs::Marker>("velocity",            100, true);
@@ -461,7 +597,9 @@ int main(int argc, char** argv)
   covVelPub = n.advertise<visualization_msgs::Marker>("covariance_velocity", 100, true);
   trajPub   = n.advertise<visualization_msgs::Marker>("trajectory",          100, true);
   sensorPub = n.advertise<visualization_msgs::Marker>("sensor",              100, true);
-  meshPub   = n.advertise<visualization_msgs::Marker>("robot",               100, true);  
+  meshPub   = n.advertise<visualization_msgs::Marker>("robot",               100, true);
+  trueStatePub=n.advertise<visualization_msgs::Marker>("true_state",         100, true);
+  cmdPub    = n.advertise<visualization_msgs::Marker>("vis_cmd",             100, true);
   heightPub = n.advertise<sensor_msgs::Range>(        "height",              100, true);  
   tf::TransformBroadcaster b;
   broadcaster = &b;

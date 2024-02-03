@@ -292,7 +292,7 @@ main(int argc, char** argv)
       state                 = quad.getState();
       stateToOdomMsg(state, odom_msg);
       quadToImuMsg(quad, imu);
-      odom_pub.publish(odom_msg);
+      //odom_pub.publish(odom_msg);
       imu_pub.publish(imu);
     }
 

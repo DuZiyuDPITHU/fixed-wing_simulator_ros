@@ -330,22 +330,49 @@ inline bool AstarPathFinder::isFree(const int &idx_x, const int &idx_y,
           (data[idx_x * GLYZ_SIZE + idx_y * GLZ_SIZE + idx_z] < 1));
 }
 
-inline void AstarPathFinder::AstarGetSucc(GridNodePtr currentPtr,
+inline void AstarPathFinder::AstarGetSucc(GridNodePtr currentPtr, int if_2d_search,
                                           vector<GridNodePtr> &neighborPtrSets,
                                           vector<double> &edgeCostSets) {
   neighborPtrSets.clear();
   edgeCostSets.clear();
   Vector3i neighborIdx;
-  for (int dx = -1; dx < 2; dx++) {
-    for (int dy = -1; dy < 2; dy++) {
-      for (int dz = -1; dz < 2; dz++) {
 
-        if (dx == 0 && dy == 0 && dz == 0)
+  if (if_2d_search == 0)
+  {
+    for (int dy = 1; dy > -2; dy--) {
+      for (int dx = 1; dx > -2; dx--) {
+        for (int dz = -1; dz < 2; dz++) {
+
+          if (dx == 0 && dy == 0 && dz == 0)
+            continue;
+
+          neighborIdx(0) = (currentPtr->index)(0) + dx;
+          neighborIdx(1) = (currentPtr->index)(1) + dy;
+          neighborIdx(2) = (currentPtr->index)(2) + dz;
+
+          if (neighborIdx(0) < 0 || neighborIdx(0) >= GLX_SIZE ||
+              neighborIdx(1) < 0 || neighborIdx(1) >= GLY_SIZE ||
+              neighborIdx(2) < 0 || neighborIdx(2) >= GLZ_SIZE) {
+            continue;
+          }
+
+          neighborPtrSets.push_back(
+              GridNodeMap[neighborIdx(0)][neighborIdx(1)][neighborIdx(2)]);
+          edgeCostSets.push_back(sqrt(dx * dx + dy * dy + dz * dz));
+        }
+      }
+    }
+  }
+  else if (if_2d_search == 1)
+  {
+    for (int dy = 1; dy > -2; dy--) {
+      for (int dx = 1; dx > -2; dx--) {
+        if (dx == 0 && dy == 0)
           continue;
 
         neighborIdx(0) = (currentPtr->index)(0) + dx;
         neighborIdx(1) = (currentPtr->index)(1) + dy;
-        neighborIdx(2) = (currentPtr->index)(2) + dz;
+        neighborIdx(2) = (currentPtr->index)(2);
 
         if (neighborIdx(0) < 0 || neighborIdx(0) >= GLX_SIZE ||
             neighborIdx(1) < 0 || neighborIdx(1) >= GLY_SIZE ||
@@ -355,10 +382,11 @@ inline void AstarPathFinder::AstarGetSucc(GridNodePtr currentPtr,
 
         neighborPtrSets.push_back(
             GridNodeMap[neighborIdx(0)][neighborIdx(1)][neighborIdx(2)]);
-        edgeCostSets.push_back(sqrt(dx * dx + dy * dy + dz * dz));
+        edgeCostSets.push_back(sqrt(dx * dx + dy * dy));
       }
     }
   }
+  
 }
 
 inline void AstarPathFinder::VoxelGetSucc(Vector3i currentPt, std::vector<Vector3i> & neighborSets)
@@ -437,9 +465,9 @@ double AstarPathFinder::getHeu(GridNodePtr node1, GridNodePtr node2, GridNodePtr
   return h;
 }
 
-void AstarPathFinder::AstarGraphSearch(Vector3d start_pt, Vector3d end_pt) {
+void AstarPathFinder::AstarGraphSearch(Vector3d start_pt, Vector3d end_pt, int if_2d_search) {
   ros::Time time_1 = ros::Time::now();
-  std::cout<< "generate trajectory from " << start_pt.transpose() << " to " << end_pt.transpose() << std::endl;
+  //std::cout<< "generate trajectory from " << start_pt.transpose() << " to " << end_pt.transpose() << std::endl;
   // index of start_point and end_point
   Vector3i start_idx = coord2gridIndex(start_pt);
   Vector3i end_idx = coord2gridIndex(end_pt);
@@ -483,7 +511,7 @@ void AstarPathFinder::AstarGraphSearch(Vector3d start_pt, Vector3d end_pt) {
   double tentative_gScore;
   vector<GridNodePtr> neighborPtrSets;
   vector<double> edgeCostSets;
-  printf("enter A* main loop\n");
+  //printf("enter A* main loop\n");
   /**
    *
    * STEP 1.3:  finish the loop
@@ -491,7 +519,7 @@ void AstarPathFinder::AstarGraphSearch(Vector3d start_pt, Vector3d end_pt) {
    * **/
   int count = 0;
   while (!openSet.empty()) {
-    // Du: Implement A* main loop
+    // Implement A* main loop
     /*
       openSet: multimap<double, GridNodePtr>
       startPtr, endPtr, currentPtr: GridNodePtr
@@ -505,11 +533,12 @@ void AstarPathFinder::AstarGraphSearch(Vector3d start_pt, Vector3d end_pt) {
     auto mapFirst = openSet.begin();
     openSet.erase(mapFirst);
     currentPtr->id = -1;
-    this->AstarGetSucc(currentPtr, neighborPtrSets, edgeCostSets);
+    this->AstarGetSucc(currentPtr, if_2d_search, neighborPtrSets, edgeCostSets);
     // check if pt is goal point
-    if (currentPtr->coord == endPtr->coord)
+    if (((currentPtr->coord == endPtr->coord) && (if_2d_search == 0))
+      ||((currentPtr->coord(0) == endPtr->coord(0)) && (currentPtr->coord(1) == endPtr->coord(1)) && (if_2d_search == 1)))
     {
-      printf("Exit A* main loop\n");
+      //printf("Exit A* main loop\n");
       return;
     }
     else
@@ -537,7 +566,7 @@ void AstarPathFinder::AstarGraphSearch(Vector3d start_pt, Vector3d end_pt) {
         }
       } 
     }
-    // Du: Implement A* main loop
+    // Implement A* main loop
   }
 
   // if search fails
@@ -565,8 +594,8 @@ vector<Vector3d> AstarPathFinder::getPath() {
     temp = temp->cameFrom;
     path.push_back(temp->coord);
   }
-  // Du: Implement A* traceback
-  printf("get A* path\n");
+  // Implement A* traceback
+  //printf("get A* path\n");
 
   return path;
 }
@@ -632,7 +661,7 @@ vector<Vector3d> AstarPathFinder::pathSimplify(const vector<Vector3d> &path,
     subPath.push_back(path.front());
     subPath.push_back(path.back());
   }
-  // Du: Implement RDP algorithm
+  // Implement RDP algorithm
   return subPath;
 }
 

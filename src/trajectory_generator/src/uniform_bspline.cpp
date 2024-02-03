@@ -59,6 +59,11 @@ bool UniformBspline::getTimeSpan(double &um, double &um_p)
 
 Eigen::MatrixXd UniformBspline::getControlPoint() { return control_points_; }
 
+void UniformBspline::setAllControlPoint(const double* new_pt, int n)
+{
+  memcpy(control_points_.data()+3*p_, new_pt, n*sizeof(new_pt[0]));
+}
+
 Eigen::VectorXd UniformBspline::evaluateDeBoor(const double &u)
 {
 
@@ -378,7 +383,7 @@ void UniformBspline::getMeanAndMaxAcc(double &mean_a, double &max_a)
 
 void BsplineOpt::set_param(ros::NodeHandle* nh, AstarPathFinder* new_path_finder)
 {
-  printf("setting bspline param\n");
+  //printf("setting bspline param\n");
   nh->param("optimization/lambda_smooth", lambda1_, -1.0);
   nh->param("optimization/lambda_collision", lambda2_, -1.0);
   nh->param("optimization/lambda_feasibility", lambda3_, -1.0);
@@ -392,6 +397,7 @@ void BsplineOpt::set_param(ros::NodeHandle* nh, AstarPathFinder* new_path_finder
   nh->param("optimization/max_K", max_K_, -1.0);
   nh->param("optimization/order_", order_, 3);
   nh->param("optimization/control_points_distance", cp_dist_, 5.0);
+  //printf("Initialize: %f, %f, %f, %f, %f\n", lambda1_, lambda2_, lambda3_, lambda4_, lambda5_);
   path_finder = new_path_finder;
   force_stop_type_ = DONT_STOP;
   iter_num_ = 0;
@@ -437,8 +443,8 @@ bool BsplineOpt::set_bspline(std::vector<Eigen::Vector3d> A_Star_Path, std::vect
     points_inv.push_back(points[i]);
     count ++;
   }
-  if (points_inv.size()<4) return false;
-  double ts = cp_dist_ / max_vel_ * 3.5;
+  if (points_inv.size()<4) {printf("no enough key points\n");return false;}
+  double ts = cp_dist_ / max_vel_ * 1.8;
   bspline.parameterizeToBspline(ts,points_inv, start_target_derivative, control_points);
   bspline = UniformBspline(control_points, order_, ts);
   control_pts = bspline.get_control_points();
@@ -483,33 +489,33 @@ void BsplineOpt::calcFeasibilityCost(const Eigen::MatrixXd &q, double &cost, Eig
     {
       if (vi(j) > max_vel_)
       {
-        cost += pow(vi(j) - max_vel_, 2) * ts_inv2; // multiply ts_inv3 to make vel and acc has similar magnitude
+        cost += pow(vi(j) - max_vel_, 2); // multiply ts_inv3 to make vel and acc has similar magnitude
 
-        gradient(j, i + 0) += -2 * (vi(j) - max_vel_) / ts * ts_inv2;
-        gradient(j, i + 1) += 2 * (vi(j) - max_vel_) / ts * ts_inv2;
+        gradient(j, i + 0) += -2 * (vi(j) - max_vel_) / ts;
+        gradient(j, i + 1) += 2 * (vi(j) - max_vel_) / ts;
       }
       else if (vi(j) < -max_vel_)
       {
-        cost += pow(vi(j) + max_vel_, 2) * ts_inv2;
+        cost += pow(vi(j) + max_vel_, 2);
 
-        gradient(j, i + 0) += -2 * (vi(j) + max_vel_) / ts * ts_inv2;
-        gradient(j, i + 1) += 2 * (vi(j) + max_vel_) / ts * ts_inv2;
+        gradient(j, i + 0) += -2 * (vi(j) + max_vel_) / ts;
+        gradient(j, i + 1) += 2 * (vi(j) + max_vel_) / ts;
       }
       else if (vi(j) < min_vel_ && vi(j) > -min_vel_)
       {
         if (vi(j) < min_vel_ && vi(j) >= 0)
         {
-          cost += pow(vi(j) - min_vel_, 2) * ts_inv2;
+          cost += pow(vi(j) - min_vel_, 2);
 
-          gradient(j, i + 0) += -2 * (min_vel_ - vi(j)) / ts * ts_inv2;
-          gradient(j, i + 1) += 2 * (min_vel_ - vi(j)) / ts * ts_inv2;
+          gradient(j, i + 0) += -2 * (min_vel_ - vi(j)) / ts;
+          gradient(j, i + 1) += 2 * (min_vel_ - vi(j)) / ts;
         }
         else
         {
-          cost += pow(vi(j) + min_vel_, 2) * ts_inv2;
+          cost += pow(vi(j) + min_vel_, 2);
 
-          gradient(j, i + 0) += 2 * (min_vel_ + vi(j)) / ts * ts_inv2;
-          gradient(j, i + 1) += -2 * (min_vel_ + vi(j)) / ts * ts_inv2;
+          gradient(j, i + 0) += 2 * (min_vel_ + vi(j)) / ts;
+          gradient(j, i + 1) += -2 * (min_vel_ + vi(j)) / ts;
         }
       }
     }
@@ -528,17 +534,17 @@ void BsplineOpt::calcFeasibilityCost(const Eigen::MatrixXd &q, double &cost, Eig
         // cout << ai(j) << endl;
         cost += pow(ai(j) - max_acc_, 2);
 
-        gradient(j, i + 0) += 2 * (ai(j) - max_acc_) * ts_inv2;
-        gradient(j, i + 1) += -4 * (ai(j) - max_acc_) * ts_inv2;
-        gradient(j, i + 2) += 2 * (ai(j) - max_acc_) * ts_inv2;
+        gradient(j, i + 0) += 2 * (ai(j) - max_acc_);
+        gradient(j, i + 1) += -4 * (ai(j) - max_acc_);
+        gradient(j, i + 2) += 2 * (ai(j) - max_acc_);
       }
       else if (ai(j) < -max_acc_)
       {
         cost += pow(ai(j) + max_acc_, 2);
 
-        gradient(j, i + 0) += 2 * (ai(j) + max_acc_) * ts_inv2;
-        gradient(j, i + 1) += -4 * (ai(j) + max_acc_) * ts_inv2;
-        gradient(j, i + 2) += 2 * (ai(j) + max_acc_) * ts_inv2;
+        gradient(j, i + 0) += 2 * (ai(j) + max_acc_);
+        gradient(j, i + 1) += -4 * (ai(j) + max_acc_);
+        gradient(j, i + 2) += 2 * (ai(j) + max_acc_);
       }
       else
       {
@@ -561,6 +567,7 @@ void BsplineOpt::calcCollisionCost(const Eigen::MatrixXd &q, double &cost, Eigen
     double edt_result;
     path_finder->getEDTValueGradient(pt, edt_result, pt_gradient);
     double dist_err = dist0_ - edt_result;
+    //std::cout<< "pt: " << pt.transpose() << std::endl << edt_result << std::endl << pt_gradient.transpose() << std::endl;
     if (dist_err < 0){}
     else if (dist_err < demarcation)
     {
@@ -583,9 +590,10 @@ void BsplineOpt::calcFitnessCost(const Eigen::MatrixXd &q, double &cost, Eigen::
 
   // def: f = |x*v|^2/a^2 + |x×v|^2/b^2
   double a2 = 25, b2 = 1;
-  for (auto i = order_ - 1; i < end_idx + 1; ++i)
+  for (auto i = order_ - 1; i < end_idx; ++i)
   {
-    Eigen::Vector3d x = (q.col(i - 1) + 4 * q.col(i) + q.col(i + 1)) / 6.0 - ref_pts_[i - 1];
+    Eigen::Vector3d x = (q.col(i) + 4 * q.col(i+1) + q.col(i+2)) / 6.0 - ref_pts_[i-2];
+    //std::cout << q.col(i+1) << ref_pts_[i-1] <<std::endl;
     Eigen::Vector3d v = (ref_pts_[i] - ref_pts_[i - 2]).normalized();
 
     double xdotv = x.dot(v);
@@ -598,9 +606,9 @@ void BsplineOpt::calcFitnessCost(const Eigen::MatrixXd &q, double &cost, Eigen::
     m << 0, -v(2), v(1), v(2), 0, -v(0), -v(1), v(0), 0;
     Eigen::Vector3d df_dx = 2 * xdotv / a2 * v + 2 / b2 * m * xcrossv;
 
-    gradient.col(i - 1) += df_dx / 6;
-    gradient.col(i) += 4 * df_dx / 6;
-    gradient.col(i + 1) += df_dx / 6;
+    gradient.col(i) += df_dx / 6;
+    gradient.col(i + 1) += 4 * df_dx / 6;
+    gradient.col(i + 2) += df_dx / 6;
   }
 }
 
@@ -608,7 +616,7 @@ void BsplineOpt::calcCurvatureCost(const Eigen::MatrixXd &q, double &cost, Eigen
 {
   cost = 0.0;
   int end_idx = q.cols() - order_;
-  for (auto i = order_+3; i < end_idx; ++i)
+  for (auto i = order_; i < end_idx+3; ++i)
   {
     double x1 = q(0, i-3);double y1 = q(1, i-3);
     double x2 = q(0, i-2);double y2 = q(1, i-2);
@@ -628,24 +636,25 @@ void BsplineOpt::calcCurvatureCost(const Eigen::MatrixXd &q, double &cost, Eigen
 
     double K0 = (dcx_t0*ddcy_t0 - ddcx_t0*dcy_t0)/sqrt(dcx_t0*dcx_t0 + dcy_t0*dcy_t0);
     double Kh = (dcx_th*ddcy_th - ddcx_th*dcy_th)/sqrt(dcx_th*dcx_th + dcy_th*dcy_th);
+    //printf("k0: %f, kh: %f\n", K0, Kh);
 
     double termx1, termx2, termy1, termy2;
 
     if (K0>0 && K0>max_K_)
     {
-      cost += K0 - max_K_;
+      cost += (K0 - max_K_)*(K0 - max_K_);
       termx1 = (ddcy_t0*pow(squa_norm0, 1.5)-3*(dcx_t0*ddcy_t0-ddcx_t0*dcy_t0)*squa_norm0*dcx_t0)/pow(squa_norm0, 3);
       termx2 = -dcy_t0/pow(squa_norm0, 1.5);
       termy1 = (-ddcx_t0*pow(squa_norm0, 1.5)-3*(dcx_t0*ddcy_t0-ddcx_t0*dcy_t0)*squa_norm0*dcy_t0)/pow(squa_norm0, 3);
       termy2 = dcx_t0/pow(squa_norm0, 1.5);
-      gradient(0, i-3) += termx1*coc.pdcx_x10 + termx2*coc.pddcx_x10;
-      gradient(1, i-3) += termy1*coc.pdcx_x10 + termy2*coc.pddcx_x10;
-      gradient(0, i-2) += termx1*coc.pdcx_x20 + termx2*coc.pddcx_x20;
-      gradient(1, i-2) += termy1*coc.pdcx_x20 + termy2*coc.pddcx_x20;
-      gradient(0, i-1) += termx1*coc.pdcx_x30 + termx2*coc.pddcx_x30;
-      gradient(1, i-1) += termy1*coc.pdcx_x30 + termy2*coc.pddcx_x30;
-      gradient(0,   i) += termx1*coc.pdcx_x40 + termx2*coc.pddcx_x40;
-      gradient(1,   i) += termy1*coc.pdcx_x40 + termy2*coc.pddcx_x40;
+      gradient(0, i-3) += (termx1*coc.pdcx_x10 + termx2*coc.pddcx_x10)*2*(K0 - max_K_);
+      gradient(1, i-3) += (termy1*coc.pdcx_x10 + termy2*coc.pddcx_x10)*2*(K0 - max_K_);
+      gradient(0, i-2) += (termx1*coc.pdcx_x20 + termx2*coc.pddcx_x20)*2*(K0 - max_K_);
+      gradient(1, i-2) += (termy1*coc.pdcx_x20 + termy2*coc.pddcx_x20)*2*(K0 - max_K_);
+      gradient(0, i-1) += (termx1*coc.pdcx_x30 + termx2*coc.pddcx_x30)*2*(K0 - max_K_);
+      gradient(1, i-1) += (termy1*coc.pdcx_x30 + termy2*coc.pddcx_x30)*2*(K0 - max_K_);
+      gradient(0,   i) += (termx1*coc.pdcx_x40 + termx2*coc.pddcx_x40)*2*(K0 - max_K_);
+      gradient(1,   i) += (termy1*coc.pdcx_x40 + termy2*coc.pddcx_x40)*2*(K0 - max_K_);
     }
     else if (K0<0 && -K0>max_K_)
     {
@@ -654,14 +663,14 @@ void BsplineOpt::calcCurvatureCost(const Eigen::MatrixXd &q, double &cost, Eigen
       termx2 = -dcy_t0/pow(squa_norm0, 1.5);
       termy1 = (-ddcx_t0*pow(squa_norm0, 1.5)-3*(dcx_t0*ddcy_t0-ddcx_t0*dcy_t0)*squa_norm0*dcy_t0)/pow(squa_norm0, 3);
       termy2 = dcx_t0/pow(squa_norm0, 1.5);
-      gradient(0, i-3) +=-termx1*coc.pdcx_x10 - termx2*coc.pddcx_x10;
-      gradient(1, i-3) +=-termy1*coc.pdcx_x10 - termy2*coc.pddcx_x10;
-      gradient(0, i-2) +=-termx1*coc.pdcx_x20 - termx2*coc.pddcx_x20;
-      gradient(1, i-2) +=-termy1*coc.pdcx_x20 - termy2*coc.pddcx_x20;
-      gradient(0, i-1) +=-termx1*coc.pdcx_x30 - termx2*coc.pddcx_x30;
-      gradient(1, i-1) +=-termy1*coc.pdcx_x30 - termy2*coc.pddcx_x30;
-      gradient(0,   i) +=-termx1*coc.pdcx_x40 - termx2*coc.pddcx_x40;
-      gradient(1,   i) +=-termy1*coc.pdcx_x40 - termy2*coc.pddcx_x40;
+      gradient(0, i-3) +=(-termx1*coc.pdcx_x10 - termx2*coc.pddcx_x10)*2*(-K0 - max_K_);
+      gradient(1, i-3) +=(-termy1*coc.pdcx_x10 - termy2*coc.pddcx_x10)*2*(-K0 - max_K_);
+      gradient(0, i-2) +=(-termx1*coc.pdcx_x20 - termx2*coc.pddcx_x20)*2*(-K0 - max_K_);
+      gradient(1, i-2) +=(-termy1*coc.pdcx_x20 - termy2*coc.pddcx_x20)*2*(-K0 - max_K_);
+      gradient(0, i-1) +=(-termx1*coc.pdcx_x30 - termx2*coc.pddcx_x30)*2*(-K0 - max_K_);
+      gradient(1, i-1) +=(-termy1*coc.pdcx_x30 - termy2*coc.pddcx_x30)*2*(-K0 - max_K_);
+      gradient(0,   i) +=(-termx1*coc.pdcx_x40 - termx2*coc.pddcx_x40)*2*(-K0 - max_K_);
+      gradient(1,   i) +=(-termy1*coc.pdcx_x40 - termy2*coc.pddcx_x40)*2*(-K0 - max_K_);
     }
     if (Kh>0 && Kh>max_K_)
     {
@@ -670,14 +679,14 @@ void BsplineOpt::calcCurvatureCost(const Eigen::MatrixXd &q, double &cost, Eigen
       termx2 = -dcy_th/pow(squa_normh, 1.5);
       termy1 = (-ddcx_th*pow(squa_normh, 1.5)-3*(dcx_th*ddcy_th-ddcx_th*dcy_th)*squa_normh*dcy_th)/pow(squa_normh, 3);
       termy2 = dcx_th/pow(squa_normh, 1.5);
-      gradient(0, i-3) += termx1*coc.pdcx_x1h + termx2*coc.pddcx_x1h;
-      gradient(1, i-3) += termy1*coc.pdcx_x1h + termy2*coc.pddcx_x1h;
-      gradient(0, i-2) += termx1*coc.pdcx_x2h + termx2*coc.pddcx_x2h;
-      gradient(1, i-2) += termy1*coc.pdcx_x2h + termy2*coc.pddcx_x2h;
-      gradient(0, i-1) += termx1*coc.pdcx_x3h + termx2*coc.pddcx_x3h;
-      gradient(1, i-1) += termy1*coc.pdcx_x3h + termy2*coc.pddcx_x3h;
-      gradient(0,   i) += termx1*coc.pdcx_x4h + termx2*coc.pddcx_x4h;
-      gradient(1,   i) += termy1*coc.pdcx_x4h + termy2*coc.pddcx_x4h;
+      gradient(0, i-3) += (termx1*coc.pdcx_x1h + termx2*coc.pddcx_x1h)*2*(Kh - max_K_);
+      gradient(1, i-3) += (termy1*coc.pdcx_x1h + termy2*coc.pddcx_x1h)*2*(Kh - max_K_);
+      gradient(0, i-2) += (termx1*coc.pdcx_x2h + termx2*coc.pddcx_x2h)*2*(Kh - max_K_);
+      gradient(1, i-2) += (termy1*coc.pdcx_x2h + termy2*coc.pddcx_x2h)*2*(Kh - max_K_);
+      gradient(0, i-1) += (termx1*coc.pdcx_x3h + termx2*coc.pddcx_x3h)*2*(Kh - max_K_);
+      gradient(1, i-1) += (termy1*coc.pdcx_x3h + termy2*coc.pddcx_x3h)*2*(Kh - max_K_);
+      gradient(0,   i) += (termx1*coc.pdcx_x4h + termx2*coc.pddcx_x4h)*2*(Kh - max_K_);
+      gradient(1,   i) += (termy1*coc.pdcx_x4h + termy2*coc.pddcx_x4h)*2*(Kh - max_K_);
     }
     else if (Kh<0 && -Kh>max_K_)
     {
@@ -686,20 +695,22 @@ void BsplineOpt::calcCurvatureCost(const Eigen::MatrixXd &q, double &cost, Eigen
       termx2 = -dcy_th/pow(squa_normh, 1.5);
       termy1 = (-ddcx_th*pow(squa_normh, 1.5)-3*(dcx_th*ddcy_th-ddcx_th*dcy_th)*squa_normh*dcy_th)/pow(squa_normh, 3);
       termy2 = dcx_th/pow(squa_normh, 1.5);
-      gradient(0, i-3) +=-termx1*coc.pdcx_x1h - termx2*coc.pddcx_x1h;
-      gradient(1, i-3) +=-termy1*coc.pdcx_x1h - termy2*coc.pddcx_x1h;
-      gradient(0, i-2) +=-termx1*coc.pdcx_x2h - termx2*coc.pddcx_x2h;
-      gradient(1, i-2) +=-termy1*coc.pdcx_x2h - termy2*coc.pddcx_x2h;
-      gradient(0, i-1) +=-termx1*coc.pdcx_x3h - termx2*coc.pddcx_x3h;
-      gradient(1, i-1) +=-termy1*coc.pdcx_x3h - termy2*coc.pddcx_x3h;
-      gradient(0,   i) +=-termx1*coc.pdcx_x4h - termx2*coc.pddcx_x4h;
-      gradient(1,   i) +=-termy1*coc.pdcx_x4h - termy2*coc.pddcx_x4h;
+      gradient(0, i-3) +=(-termx1*coc.pdcx_x1h - termx2*coc.pddcx_x1h)*2*(-Kh - max_K_);
+      gradient(1, i-3) +=(-termy1*coc.pdcx_x1h - termy2*coc.pddcx_x1h)*2*(-Kh - max_K_);
+      gradient(0, i-2) +=(-termx1*coc.pdcx_x2h - termx2*coc.pddcx_x2h)*2*(-Kh - max_K_);
+      gradient(1, i-2) +=(-termy1*coc.pdcx_x2h - termy2*coc.pddcx_x2h)*2*(-Kh - max_K_);
+      gradient(0, i-1) +=(-termx1*coc.pdcx_x3h - termx2*coc.pddcx_x3h)*2*(-Kh - max_K_);
+      gradient(1, i-1) +=(-termy1*coc.pdcx_x3h - termy2*coc.pddcx_x3h)*2*(-Kh - max_K_);
+      gradient(0,   i) +=(-termx1*coc.pdcx_x4h - termx2*coc.pddcx_x4h)*2*(-Kh - max_K_);
+      gradient(1,   i) +=(-termy1*coc.pdcx_x4h - termy2*coc.pddcx_x4h)*2*(-Kh - max_K_);
     }
   }
 }
 
 void BsplineOpt::combineOptCost(const double *x, double *grad, double &f_combine, const int n)
 {
+  bspline.setAllControlPoint(x, n);
+
   double f_smoothness, f_distance, f_feasibility;
 
   Eigen::MatrixXd g_smoothness = Eigen::MatrixXd::Zero(3, bspline.getControlPtSize());
@@ -716,13 +727,15 @@ void BsplineOpt::combineOptCost(const double *x, double *grad, double &f_combine
   calcFeasibilityCost(control_pts, f_feasibility, g_feasibility);
 
   f_combine = lambda1_ * f_smoothness + lambda2_ * f_distance + lambda3_ * f_feasibility;
-  //printf("current f_combine: %f\n");
+  //printf("[OPT] current f_smothness: %f, f_distance: %f, f_feasibility: %f\n", lambda1_*f_smoothness, lambda2_*f_distance, lambda3_*f_feasibility);
   Eigen::MatrixXd grad_3D = lambda1_ * g_smoothness + lambda2_ * g_distance + lambda3_ * g_feasibility;
   memcpy(grad, grad_3D.data() + 3 * order_, n * sizeof(grad[0]));
 }
 
 void BsplineOpt::combineAdjCost(const double *x, double *grad, double &f_combine, const int n)
 {
+  bspline.setAllControlPoint(x, n);
+  
   double f_fitness, f_curvature;
 
   Eigen::MatrixXd g_fitness = Eigen::MatrixXd::Zero(3, bspline.getControlPtSize());
@@ -733,6 +746,7 @@ void BsplineOpt::combineAdjCost(const double *x, double *grad, double &f_combine
   calcCurvatureCost(control_pts, f_curvature, g_curvature);
 
   f_combine = lambda5_*f_fitness + lambda4_*f_curvature;
+  //printf("[ADJ] current f_fitness: %f, f_curvature: %f\n", f_fitness, f_curvature);
   Eigen::MatrixXd grad_3D = lambda5_*g_fitness + lambda4_*g_curvature;
   memcpy(grad, grad_3D.data() + 3 * order_, n * sizeof(grad[0]));
 }
@@ -794,7 +808,7 @@ bool BsplineOpt::optStage()
     lbfgs::lbfgs_parameter_t lbfgs_params;
     lbfgs::lbfgs_load_default_parameters(&lbfgs_params);
     lbfgs_params.mem_size = 16;
-    lbfgs_params.max_iterations = 200;
+    lbfgs_params.max_iterations = 400;
     lbfgs_params.g_epsilon = 0.01;
 
     /* ---------- optimize ---------- */
@@ -881,7 +895,7 @@ bool BsplineOpt::adjStage()
   double final_cost;
   Eigen::MatrixXd ctrlpts = bspline.getControlPoint();
   ref_pts_.clear();
-  for (int i=start_id;i<=end_id;i++)
+  for (int i=start_id-1;i<=end_id;i++)
   {
     ref_pts_.push_back(ctrlpts.col(i));
   }
@@ -906,7 +920,7 @@ bool BsplineOpt::adjStage()
     lbfgs::lbfgs_parameter_t lbfgs_params;
     lbfgs::lbfgs_load_default_parameters(&lbfgs_params);
     lbfgs_params.mem_size = 16;
-    lbfgs_params.max_iterations = 200;
+    lbfgs_params.max_iterations = 400;
     lbfgs_params.g_epsilon = 0.01;
 
     /* ---------- optimize ---------- */

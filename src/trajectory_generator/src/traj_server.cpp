@@ -2,13 +2,18 @@
 #include "nav_msgs/Odometry.h"
 #include "quadrotor_msgs/Bspline.h"
 #include "quadrotor_msgs/PositionCommand.h"
+#include <mav_msgs/Commands.h>
 #include "std_msgs/Empty.h"
 #include "visualization_msgs/Marker.h"
 #include <ros/ros.h>
+#include <cmath>
 
 ros::Publisher pos_cmd_pub;
+ros::Publisher fw_pos_cmd_pub;
+ros::Subscriber odom_sub;
 
 quadrotor_msgs::PositionCommand cmd;
+mav_msgs::Commands fw_cmd;
 double pos_gain[3] = {0, 0, 0};
 double vel_gain[3] = {0, 0, 0};
 
@@ -22,6 +27,22 @@ int traj_id_;
 // yaw control
 double last_yaw_, last_yaw_dot_;
 double time_forward_;
+Eigen::Vector3d odom_pt;
+Eigen::Vector3d odom_vel;
+
+/*
+class PDcontrol
+{
+  double kp;
+  double kd;
+  double sigma = 0.01;
+  double y_prev = 0.0;
+  double eprev_ = 0.0;
+  double y_dot = 0.0;
+};
+
+PDcontrol Va_controller, chi_controller;*/ 
+
 
 void bsplineCallback(quadrotor_msgs::BsplineConstPtr msg)
 {
@@ -68,6 +89,44 @@ void bsplineCallback(quadrotor_msgs::BsplineConstPtr msg)
   printf("received bspline traj for %f\n", traj_duration_);
 }
 
+double calculate_phi_ff(double t_cur)
+{
+  // clockwise rotation is declared as positive
+  double phi_ff;
+  double V_a = odom_vel.norm();
+  Eigen::Vector3d dir = t_cur + time_forward_ <= traj_duration_ ? traj_[0].evaluateDeBoorT(t_cur + time_forward_) - odom_pt : traj_[0].evaluateDeBoorT(traj_duration_) - odom_pt;
+  double L1 = dir.norm();
+  double c_ita = dir.dot(odom_vel)/(V_a*L1);
+  double s_ita = sqrt(1-c_ita);
+  phi_ff = atan((2*V_a*V_a*s_ita)/(L1*9.8));
+
+  Eigen::Vector3d L1_dir = dir.dot(odom_vel)>0? dir: -1*dir;
+  if (odom_vel.cross(L1_dir)(2)>0)
+    phi_ff *= -1;
+  return phi_ff;
+  /*
+  double V_g = vel.norm();
+  Eigen::Vector3d v_cross_a = vel.cross(acc);
+  double kappa = v_cross_a.norm()/(V_g*V_g*V_g);
+  double phi_ff_abs = abs(atan(kappa*V_g*V_g/9.8));
+  if (v_cross_a(2)>0)
+  {
+    phi_ff_abs *= -1;
+  }
+  return phi_ff_abs;
+  */
+}
+
+double calculate_Va(double t_cur)
+{
+  double tar_Va;
+  Eigen::Vector3d dir = t_cur + time_forward_ <= traj_duration_ ? traj_[0].evaluateDeBoorT(t_cur + time_forward_) - odom_pt : traj_[0].evaluateDeBoorT(traj_duration_) - odom_pt;
+  if (odom_vel.norm()==0) tar_Va = dir.dot(odom_vel.normalized())/time_forward_;
+  else tar_Va = dir.dot(odom_vel.normalized())/time_forward_;
+  if (tar_Va<0) tar_Va = 0;
+  return tar_Va;
+}
+
 std::pair<double, double> calculate_yaw(double t_cur, Eigen::Vector3d &pos, ros::Time &time_now, ros::Time &time_last)
 {
   constexpr double PI = 3.1415926;
@@ -78,8 +137,11 @@ std::pair<double, double> calculate_yaw(double t_cur, Eigen::Vector3d &pos, ros:
   double yawdot = 0;
 
   Eigen::Vector3d dir = t_cur + time_forward_ <= traj_duration_ ? pos - traj_[0].evaluateDeBoorT(t_cur + time_forward_) : pos - traj_[0].evaluateDeBoorT(traj_duration_);
+  //std::cout << "pos: " << pos << std::endl << "tar" << traj_[0].evaluateDeBoorT(t_cur + time_forward_) << std::endl;
   double yaw_temp = dir.norm() > 0.1 ? atan2(dir(1), dir(0)) : last_yaw_;
+  
   double max_yaw_change = YAW_DOT_MAX_PER_SEC * (time_now - time_last).toSec();
+  
   if (yaw_temp - last_yaw_ > PI)
   {
     if (yaw_temp - last_yaw_ - 2 * PI < -max_yaw_change)
@@ -147,7 +209,7 @@ std::pair<double, double> calculate_yaw(double t_cur, Eigen::Vector3d &pos, ros:
         yawdot = (yaw_temp - last_yaw_) / (time_now - time_last).toSec();
     }
   }
-
+  
   if (fabs(yaw - last_yaw_) <= max_yaw_change)
     yaw = 0.5 * last_yaw_ + 0.5 * yaw; // nieve LPF
   yawdot = 0.5 * last_yaw_dot_ + 0.5 * yawdot;
@@ -155,6 +217,7 @@ std::pair<double, double> calculate_yaw(double t_cur, Eigen::Vector3d &pos, ros:
   last_yaw_dot_ = yawdot;
 
   yaw_yawdot.first = yaw;
+  //yaw_yawdot.first = yaw_temp;
   yaw_yawdot.second = yawdot;
 
   return yaw_yawdot;
@@ -172,6 +235,9 @@ void cmdCallback(const ros::TimerEvent &e)
 
   Eigen::Vector3d pos(Eigen::Vector3d::Zero()), vel(Eigen::Vector3d::Zero()), acc(Eigen::Vector3d::Zero()), pos_f;
   std::pair<double, double> yaw_yawdot(0, 0);
+  std::pair<double, double> fw_yaw_yawdot(0, 0);
+  double phi_ff;
+  double cmd_Va;
 
   static ros::Time time_last = ros::Time::now();
   if (t_cur < traj_duration_ && t_cur >= 0.0)
@@ -181,8 +247,14 @@ void cmdCallback(const ros::TimerEvent &e)
     acc = traj_[2].evaluateDeBoorT(t_cur);
 
     /*** calculate yaw ***/
-    yaw_yawdot = calculate_yaw(t_cur, pos, time_now, time_last);
+    //yaw_yawdot = calculate_yaw(t_cur, pos, time_now, time_last);
+    fw_yaw_yawdot = calculate_yaw(t_cur, odom_pt, time_now, time_last);
     /*** calculate yaw ***/
+
+    /*** calculate phi_ff and Va ***/
+    phi_ff = calculate_phi_ff(t_cur);
+    cmd_Va = calculate_Va(t_cur);
+    /*** calculate phi_ff and Va ***/
 
     double tf = min(traj_duration_, t_cur + 2.0);
     pos_f = traj_[0].evaluateDeBoorT(tf);
@@ -194,8 +266,8 @@ void cmdCallback(const ros::TimerEvent &e)
     vel.setZero();
     acc.setZero();
 
-    yaw_yawdot.first = last_yaw_;
-    yaw_yawdot.second = 0;
+    //yaw_yawdot.first = last_yaw_;
+    //yaw_yawdot.second = 0;
 
     pos_f = pos;
   }
@@ -213,7 +285,7 @@ void cmdCallback(const ros::TimerEvent &e)
   cmd.position.x = pos(0);
   cmd.position.y = pos(1);
   cmd.position.z = pos(2);
-
+/*
   cmd.velocity.x = vel(0);
   cmd.velocity.y = vel(1);
   cmd.velocity.z = vel(2);
@@ -224,11 +296,36 @@ void cmdCallback(const ros::TimerEvent &e)
 
   cmd.yaw = yaw_yawdot.first;
   cmd.yaw_dot = yaw_yawdot.second;
-
   last_yaw_ = cmd.yaw;
+*/
+  //pos_cmd_pub.publish(cmd);
 
-  pos_cmd_pub.publish(cmd);
-  //printf("cmd published\n");
+  fw_cmd.header.stamp = time_now;
+  fw_cmd.header.frame_id = "world";
+
+  fw_cmd.Va_cmd = cmd_Va;
+
+  double fw_yaw_cmd = (fw_yaw_yawdot.first)/3.14159265*(180)+180;
+  if (fw_yaw_cmd >=180) fw_yaw_cmd-=360;
+  else if (fw_yaw_cmd <= -180) fw_yaw_cmd += 360;
+  fw_cmd.chi_cmd = fw_yaw_cmd;
+  fw_cmd.h_cmd = pos(2);
+  fw_cmd.phi_ff = phi_ff;
+  //printf("fw_yaw_cmd: %f\n", fw_yaw_cmd);
+  fw_pos_cmd_pub.publish(fw_cmd);
+//printf("chi: %f, phi_ff: %f, V_a: %f\n", yaw_yawdot.first/3.14159265*(180), phi_ff, vel.norm());
+}
+
+void odomCallback(const nav_msgs::Odometry::ConstPtr& odom)
+{
+  odom_pt(0) = odom->pose.pose.position.x;
+  odom_pt(1) = odom->pose.pose.position.y;
+  odom_pt(2) = odom->pose.pose.position.z;
+
+  odom_vel(0) = odom->twist.twist.linear.x;
+  odom_vel(1) = odom->twist.twist.linear.y;
+  odom_vel(2) = odom->twist.twist.linear.z;
+  //printf("V_a: %f\n", odom_vel.norm());
 }
 
 int main(int argc, char **argv)
@@ -238,10 +335,12 @@ int main(int argc, char **argv)
   ros::NodeHandle nh("~");
   printf("start traj server node\n");
   ros::Subscriber bspline_sub = node.subscribe("trajectory_generator_node/bspline_trajectory", 10, bsplineCallback);
+  odom_sub = node.subscribe("/visual_slam/odom", 10, odomCallback);
 
-  pos_cmd_pub = node.advertise<quadrotor_msgs::PositionCommand>("position_cmd", 20);
+  pos_cmd_pub = node.advertise<quadrotor_msgs::PositionCommand>("pos_cmd", 20);
+  fw_pos_cmd_pub = node.advertise<mav_msgs::Commands>("fw_position_cmd", 20);
 
-  ros::Timer cmd_timer = node.createTimer(ros::Duration(0.01), cmdCallback);
+  ros::Timer cmd_timer = node.createTimer(ros::Duration(0.05), cmdCallback);
 
   /* control parameter */
   cmd.kx[0] = pos_gain[0];
@@ -252,7 +351,7 @@ int main(int argc, char **argv)
   cmd.kv[1] = vel_gain[1];
   cmd.kv[2] = vel_gain[2];
 
-  nh.param("traj_server/time_forward", time_forward_, -1.0);
+  nh.param("traj_server/time_forward", time_forward_, 1.0);
   last_yaw_ = 0.0;
   last_yaw_dot_ = 0.0;
 
