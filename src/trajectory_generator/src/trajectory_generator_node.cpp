@@ -24,7 +24,7 @@
 #include "backward.hpp"
 #include "trajectory_generator_waypoint.h"
 #include "uniform_bspline.h"
-//#include "traj_server.h"
+#include <ego_planner/planner_manager.h>
 
 using namespace std;
 using namespace Eigen;
@@ -45,6 +45,7 @@ double _Vel, _Acc;
 int _dev_order, _min_order;
 double hovering_speed, hovering_radius;
 int if_2d_search;
+int planning_alg;
 double h_reference;
 
 int num_cp;
@@ -726,6 +727,7 @@ int main(int argc, char **argv) {
   ros::NodeHandle nh("~");
   nh_ptr = &nh;
 
+  nh.param("planning/planning_alg", planning_alg, 1);
   nh.param("planning/vel", _Vel, 1.0);
   nh.param("planning/acc", _Acc, 1.0);
   nh.param("planning/dev_order", _dev_order, 3);
@@ -748,10 +750,6 @@ int main(int argc, char **argv) {
 
   _exec_timer = nh.createTimer(ros::Duration(0.01), execCallback);
 
-  _odom_sub = nh.subscribe("odom", 10, rcvOdomCallback);
-  _map_sub = nh.subscribe("/pcl_render_node/local_pointcloud", 1, rcvPointCloudCallBack);
-  _pts_sub = nh.subscribe("waypoints", 1, rcvWaypointsCallBack);
-
   _traj_pub =
       nh.advertise<quadrotor_msgs::PolynomialTrajectory>("trajectory", 50);
   _default_traj_pub = nh.advertise<visualization_msgs::Marker>("default_path", 1);
@@ -761,18 +759,29 @@ int main(int argc, char **argv) {
   _path_vis_pub = nh.advertise<visualization_msgs::Marker>("vis_path", 1);
   bspline_pub = nh.advertise<quadrotor_msgs::Bspline>("bspline_trajectory", 10);
   // set the obstacle map
-  _map_lower << -_x_size / 2.0, -_y_size / 2.0, 0.0;
-  _map_upper << +_x_size / 2.0, +_y_size / 2.0, _z_size;
-  _inv_resolution = 1.0 / _resolution;
-  _max_x_id = (int)(_x_size * _inv_resolution);
-  _max_y_id = (int)(_y_size * _inv_resolution);
-  _max_z_id = (int)(_z_size * _inv_resolution);
+  if (planning_alg == 1)
+  {
+    _odom_sub = nh.subscribe("odom", 10, rcvOdomCallback);
+    _map_sub = nh.subscribe("/pcl_render_node/local_pointcloud", 1, rcvPointCloudCallBack);
+    _pts_sub = nh.subscribe("waypoints", 1, rcvWaypointsCallBack);
 
-  _astar_path_finder = new AstarPathFinder();
-  //TrajectoryServer server(nh);
-  _astar_path_finder->initGridMap(_resolution, _map_lower, _map_upper,
-                                  _max_x_id, _max_y_id, _max_z_id);
+    _map_lower << -_x_size / 2.0, -_y_size / 2.0, 0.0;
+    _map_upper << +_x_size / 2.0, +_y_size / 2.0, _z_size;
+    _inv_resolution = 1.0 / _resolution;
+    _max_x_id = (int)(_x_size * _inv_resolution);
+    _max_y_id = (int)(_y_size * _inv_resolution);
+    _max_z_id = (int)(_z_size * _inv_resolution);
 
+    _astar_path_finder = new AstarPathFinder();
+    //TrajectoryServer server(nh);
+    _astar_path_finder->initGridMap(_resolution, _map_lower, _map_upper,
+                                    _max_x_id, _max_y_id, _max_z_id);
+  }
+  else 
+  {
+    EGO_Planner = EGOPlannerManager();
+    EGO_Planner.initPlanModules(nh);
+  }
   ros::Rate rate(100);
   bool status = ros::ok();
   while (status) {

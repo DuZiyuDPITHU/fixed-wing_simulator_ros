@@ -23,8 +23,16 @@ find_package(catkin REQUIRED COMPONENTS
   nav_msgs
   visualization_msgs
   quadrotor_msgs
+  plan_env
+  bspline_opt
+  ego_planner
 )
-catkin_package()
+catkin_package(
+  INCLUDE_DIRS include
+ LIBRARIES trajectory_generator
+ CATKIN_DEPENDS plan_env bspline_opt ego_planner
+#  DEPENDS system_lib
+)
 
 find_package(Eigen3 REQUIRED)
 find_package(PCL REQUIRED)
@@ -39,14 +47,14 @@ include_directories(
     ${PCL_INCLUDE_DIRS} 
 )
 
-add_executable(trajectory_generator_node
+add_executable(trajectory_generator
 	src/trajectory_generator_node.cpp
 	src/trajectory_generator_waypoint.cpp
   src/Astar_searcher.cpp
   src/uniform_bspline.cpp
 )
 
-target_link_libraries(trajectory_generator_node
+target_link_libraries(trajectory_generator
    ${catkin_LIBRARIES}
    ${PCL_LIBRARIES}
 )

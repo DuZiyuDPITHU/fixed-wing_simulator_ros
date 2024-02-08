@@ -19,7 +19,7 @@
       <remap from="~local_pointcloud" to="/pcl_render_node/local_pointcloud"/> 
       <remap from="~odom"             to="/visual_slam/odom"/>
       
-      
+      <param name="planning/planning_alg"       value="1"    />
       <param name="planning/if_2d_search"       value="1"    />
       <param name="planning/h_reference"        value="15.0" />
       <param name="planning/vel"                value="3.0"  />
@@ -53,6 +53,19 @@
       <param name="hovering_speed" value="6.0" type="double"/>
       <param name="hovering_radius" value="20.0" type="double"/>
 
+      <param name="ego_planner_manager/max_vel"                 value="3.0"   type="double"/>
+      <param name="ego_planner_manager/max_acc"                 value="2.0"   type="double"/>
+      <param name="ego_planner_manager/max_jerk"                value="4.0"   type="double"/>
+      <param name="ego_planner_manager/control_points_distance" value="4.0"   type="double"/>
+      <param name="ego_planner_manager/feasibility_tolerance"   value="0.05"  type="double"/>
+      <param name="ego_planner_manager/planning_horizon"        value="$(arg sensing_horizon)" type="double"/>
+      <param name="ego_planner_grid_map/local_update_range_x"   value="25" /> 
+      <param name="ego_planner_grid_map/local_update_range_y"   value="25" /> 
+      <param name="ego_planner_grid_map/local_update_range_z"   value="25" /> 
+      <param name="ego_planner_grid_map/obstacles_inflation"    value="1.0"/>
+      <param name="ego_planner_grid_map/obstacles_inflation"    value="1.0"/> 
+
+
   </node>
 
   <!-- Trajectory Command server -->
@@ -76,7 +89,7 @@
     <param name="map/circle_num" value="0"/>        
     <param name="map/obs_num"    value="66"/>        
     <param name="map/resolution" value="1"/> 
-    <param name="map/random_seed" value="140.0"/>
+    <param name="map/random_seed" value="40.0"/>
  
 
     <param name="ObstacleShape/lower_rad" value="4"/>
