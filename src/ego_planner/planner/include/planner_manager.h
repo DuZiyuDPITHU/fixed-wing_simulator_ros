@@ -35,7 +35,7 @@ namespace ego_planner
     bool planGlobalTrajWaypoints(const Eigen::Vector3d &start_pos, const Eigen::Vector3d &start_vel, const Eigen::Vector3d &start_acc,
                                  const std::vector<Eigen::Vector3d> &waypoints, const Eigen::Vector3d &end_vel, const Eigen::Vector3d &end_acc);
 
-    void initPlanModules(ros::NodeHandle &nh, PlanningVisualization::Ptr vis = NULL);
+    void initPlanModules(ros::NodeHandle &nh);
 
     PlanParameters pp_;
     LocalTrajData local_data_;
@@ -44,7 +44,6 @@ namespace ego_planner
 
   private:
     /* main planning algorithms & modules */
-    PlanningVisualization::Ptr visualization_;
 
     BsplineOptimizer::Ptr bspline_optimizer_rebound_;
 

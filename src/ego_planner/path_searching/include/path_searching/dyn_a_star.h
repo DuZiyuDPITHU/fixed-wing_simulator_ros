@@ -8,11 +8,11 @@
 #include <plan_env/grid_map.h>
 #include <queue>
 
-constexpr double inf = 1 >> 20;
-struct GridNode;
-typedef GridNode *GridNodePtr;
+constexpr double inf_ = 1 >> 20;
+struct GridNode_;
+typedef GridNode_ *GridNodePtr_;
 
-struct GridNode
+struct GridNode_
 {
 	enum enum_state
 	{
@@ -28,14 +28,14 @@ struct GridNode
 	};
 	Eigen::Vector3i index;
 
-	double gScore{inf}, fScore{inf};
-	GridNodePtr cameFrom{NULL};
+	double gScore{inf_}, fScore{inf_};
+	GridNodePtr_ cameFrom{NULL};
 };
 
 class NodeComparator
 {
 public:
-	bool operator()(GridNodePtr node1, GridNodePtr node2)
+	bool operator()(GridNodePtr_ node1, GridNodePtr_ node2)
 	{
 		return node1->fScore > node2->fScore;
 	}
@@ -48,10 +48,10 @@ private:
 
 	inline void coord2gridIndexFast(const double x, const double y, const double z, int &id_x, int &id_y, int &id_z);
 
-	double getDiagHeu(GridNodePtr node1, GridNodePtr node2);
-	double getManhHeu(GridNodePtr node1, GridNodePtr node2);
-	double getEuclHeu(GridNodePtr node1, GridNodePtr node2);
-	inline double getHeu(GridNodePtr node1, GridNodePtr node2);
+	double getDiagHeu(GridNodePtr_ node1, GridNodePtr_ node2);
+	double getManhHeu(GridNodePtr_ node1, GridNodePtr_ node2);
+	double getEuclHeu(GridNodePtr_ node1, GridNodePtr_ node2);
+	inline double getHeu(GridNodePtr_ node1, GridNodePtr_ node2);
 
 	bool ConvertToIndexAndAdjustStartEndPoints(const Eigen::Vector3d start_pt, const Eigen::Vector3d end_pt, Eigen::Vector3i &start_idx, Eigen::Vector3i &end_idx);
 
@@ -62,17 +62,17 @@ private:
 
 	inline bool checkOccupancy(const Eigen::Vector3d &pos) { return (bool)grid_map_->getInflateOccupancy(pos); }
 
-	std::vector<GridNodePtr> retrievePath(GridNodePtr current);
+	std::vector<GridNodePtr_> retrievePath(GridNodePtr_ current);
 
 	double step_size_, inv_step_size_;
 	Eigen::Vector3d center_;
 	Eigen::Vector3i CENTER_IDX_, POOL_SIZE_;
 	const double tie_breaker_ = 1.0 + 1.0 / 10000;
 
-	std::vector<GridNodePtr> gridPath_;
+	std::vector<GridNodePtr_> gridPath_;
 
-	GridNodePtr ***GridNodeMap_;
-	std::priority_queue<GridNodePtr, std::vector<GridNodePtr>, NodeComparator> openSet_;
+	GridNodePtr_ ***GridNodeMap_;
+	std::priority_queue<GridNodePtr_, std::vector<GridNodePtr_>, NodeComparator> openSet_;
 
 	int rounds_{0};
 
@@ -89,7 +89,7 @@ public:
 	std::vector<Eigen::Vector3d> getPath();
 };
 
-inline double AStar::getHeu(GridNodePtr node1, GridNodePtr node2)
+inline double AStar::getHeu(GridNodePtr_ node1, GridNodePtr_ node2)
 {
 	return tie_breaker_ * getDiagHeu(node1, node2);
 }

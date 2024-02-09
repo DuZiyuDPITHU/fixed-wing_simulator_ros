@@ -11,7 +11,7 @@ namespace ego_planner
 
   EGOPlannerManager::~EGOPlannerManager() { std::cout << "des manager" << std::endl; }
 
-  void EGOPlannerManager::initPlanModules(ros::NodeHandle &nh, PlanningVisualization::Ptr vis)
+  void EGOPlannerManager::initPlanModules(ros::NodeHandle &nh)
   {
     /* read algorithm parameters */
 
@@ -32,7 +32,7 @@ namespace ego_planner
     bspline_optimizer_rebound_->a_star_.reset(new AStar);
     bspline_optimizer_rebound_->a_star_->initGridMap(grid_map_, Eigen::Vector3i(100, 100, 100));
 
-    visualization_ = vis;
+    //visualization_ = vis;
   }
 
   // !SECTION
@@ -217,8 +217,8 @@ namespace ego_planner
     t_init = ros::Time::now() - t_start;
 
     static int vis_id = 0;
-    visualization_->displayInitPathList(point_set, 0.2, 0);
-    visualization_->displayAStarList(a_star_pathes, vis_id);
+    //visualization_->displayInitPathList(point_set, 0.2, 0);
+    //visualization_->displayAStarList(a_star_pathes, vis_id);
 
     t_start = ros::Time::now();
 

@@ -96,7 +96,7 @@ void GridMap::initMap(ros::NodeHandle &nh)
   /* init callback */
 
   depth_sub_.reset(new message_filters::Subscriber<sensor_msgs::Image>(node_, "/grid_map/depth", 50));
-
+  /*
   if (mp_.pose_type_ == POSE_STAMPED)
   {
     pose_sub_.reset(
@@ -114,7 +114,7 @@ void GridMap::initMap(ros::NodeHandle &nh)
         SyncPolicyImageOdom(100), *depth_sub_, *odom_sub_));
     sync_image_odom_->registerCallback(boost::bind(&GridMap::depthOdomCallback, this, _1, _2));
   }
-
+  */
   // use odometry and point cloud
   //local_cloud_sub_ =
       //node_.subscribe<sensor_msgs::PointCloud2>("/pcl_render_node/local_pointcloud", 1, &GridMap::LocalPointCloudCallBack, this);
@@ -199,7 +199,7 @@ int GridMap::setCacheOccupancy(Eigen::Vector3d pos, int occ)
 
   return idx_ctns;
 }
-
+/*
 void GridMap::projectDepthImage()
 {
   // md_.proj_points_.clear();
@@ -240,7 +240,6 @@ void GridMap::projectDepthImage()
       }
     }
   }
-  /* use depth filter */
   else
   {
 
@@ -319,13 +318,12 @@ void GridMap::projectDepthImage()
     }
   }
 
-  /* maintain camera pose for consistency check */
 
   md_.last_camera_pos_ = md_.camera_pos_;
   md_.last_camera_q_ = md_.camera_q_;
   md_.last_depth_image_ = md_.depth_image_;
 }
-
+*/
 void GridMap::raycastProcess()
 {
   // if (md_.proj_points_.size() == 0)
@@ -661,7 +659,7 @@ void GridMap::updateOccupancyCallback(const ros::TimerEvent & /*event*/)
   // ros::Time t1, t2, t3, t4;
   // t1 = ros::Time::now();
 
-  projectDepthImage();
+  //projectDepthImage();
   // t2 = ros::Time::now();
   raycastProcess();
   // t3 = ros::Time::now();
@@ -684,11 +682,11 @@ void GridMap::updateOccupancyCallback(const ros::TimerEvent & /*event*/)
   md_.occ_need_update_ = false;
   md_.local_updated_ = false;
 }
-
+/*
 void GridMap::depthPoseCallback(const sensor_msgs::ImageConstPtr &img,
                                 const geometry_msgs::PoseStampedConstPtr &pose)
 {
-  /* get depth image */
+
   cv_bridge::CvImagePtr cv_ptr;
   cv_ptr = cv_bridge::toCvCopy(img, img->encoding);
 
@@ -700,7 +698,7 @@ void GridMap::depthPoseCallback(const sensor_msgs::ImageConstPtr &img,
 
   // std::cout << "depth: " << md_.depth_image_.cols << ", " << md_.depth_image_.rows << std::endl;
 
-  /* get pose */
+
   md_.camera_pos_(0) = pose->pose.position.x;
   md_.camera_pos_(1) = pose->pose.position.y;
   md_.camera_pos_(2) = pose->pose.position.z;
@@ -716,7 +714,7 @@ void GridMap::depthPoseCallback(const sensor_msgs::ImageConstPtr &img,
   {
     md_.occ_need_update_ = false;
   }
-}
+}*/
 void GridMap::odomCallback(const nav_msgs::OdometryConstPtr &odom)
 {
   if (md_.has_first_depth_)
@@ -917,11 +915,11 @@ void GridMap::getRegion(Eigen::Vector3d &ori, Eigen::Vector3d &size)
 {
   ori = mp_.map_origin_, size = mp_.map_size_;
 }
-
+/*
 void GridMap::depthOdomCallback(const sensor_msgs::ImageConstPtr &img,
                                 const nav_msgs::OdometryConstPtr &odom)
 {
-  /* get pose */
+
   Eigen::Quaterniond body_q = Eigen::Quaterniond(odom->pose.pose.orientation.w,
                                                  odom->pose.pose.orientation.x,
                                                  odom->pose.pose.orientation.y,
@@ -940,7 +938,7 @@ void GridMap::depthOdomCallback(const sensor_msgs::ImageConstPtr &img,
   md_.camera_pos_(2) = cam_T(2, 3);
   md_.camera_q_ = Eigen::Quaterniond(cam_T.block<3, 3>(0, 0));
 
-  /* get depth image */
+
   cv_bridge::CvImagePtr cv_ptr;
   cv_ptr = cv_bridge::toCvCopy(img, img->encoding);
   if (img->encoding == sensor_msgs::image_encodings::TYPE_32FC1)
@@ -951,5 +949,5 @@ void GridMap::depthOdomCallback(const sensor_msgs::ImageConstPtr &img,
 
   md_.occ_need_update_ = true;
 }
-
+*/
 // GridMap

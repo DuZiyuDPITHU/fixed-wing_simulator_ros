@@ -24,7 +24,7 @@
 #include "backward.hpp"
 #include "trajectory_generator_waypoint.h"
 #include "uniform_bspline.h"
-#include <ego_planner/planner_manager.h>
+#include <planner_manager.h>
 
 using namespace std;
 using namespace Eigen;
@@ -779,7 +779,7 @@ int main(int argc, char **argv) {
   }
   else 
   {
-    EGO_Planner = EGOPlannerManager();
+    ego_planner::EGOPlannerManager EGO_Planner;
     EGO_Planner.initPlanModules(nh);
   }
   ros::Rate rate(100);

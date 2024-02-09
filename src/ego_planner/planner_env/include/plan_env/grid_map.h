@@ -3,7 +3,6 @@
 
 #include <Eigen/Eigen>
 #include <Eigen/StdVector>
-#include <cv_bridge/cv_bridge.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <iostream>
 #include <random>
@@ -98,7 +97,7 @@ struct MappingData {
 
   // depth image data
 
-  cv::Mat depth_image_, last_depth_image_;
+  //cv::Mat depth_image_, last_depth_image_;
   int image_cnt_;
 
   Eigen::Matrix4d cam2body_;
@@ -187,9 +186,9 @@ private:
   MappingData md_;
 
   // get depth image and camera pose
-  void depthPoseCallback(const sensor_msgs::ImageConstPtr& img,
-                         const geometry_msgs::PoseStampedConstPtr& pose);
-  void depthOdomCallback(const sensor_msgs::ImageConstPtr& img, const nav_msgs::OdometryConstPtr& odom);
+  //void depthPoseCallback(const sensor_msgs::ImageConstPtr& img,
+  //                       const geometry_msgs::PoseStampedConstPtr& pose);
+  //void depthOdomCallback(const sensor_msgs::ImageConstPtr& img, const nav_msgs::OdometryConstPtr& odom);
   void cloudCallback(const sensor_msgs::PointCloud2 &pointcloud_map);
   void odomCallback(const nav_msgs::OdometryConstPtr& odom);
 
@@ -198,7 +197,7 @@ private:
   void visCallback(const ros::TimerEvent& /*event*/);
 
   // main update process
-  void projectDepthImage();
+  //void projectDepthImage();
   void raycastProcess();
   void clearAndInflateLocalMap();
 

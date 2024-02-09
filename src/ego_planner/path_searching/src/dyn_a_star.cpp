@@ -16,16 +16,16 @@ void AStar::initGridMap(GridMap::Ptr occ_map, const Eigen::Vector3i pool_size)
     POOL_SIZE_ = pool_size;
     CENTER_IDX_ = pool_size / 2;
 
-    GridNodeMap_ = new GridNodePtr **[POOL_SIZE_(0)];
+    GridNodeMap_ = new GridNodePtr_ **[POOL_SIZE_(0)];
     for (int i = 0; i < POOL_SIZE_(0); i++)
     {
-        GridNodeMap_[i] = new GridNodePtr *[POOL_SIZE_(1)];
+        GridNodeMap_[i] = new GridNodePtr_ *[POOL_SIZE_(1)];
         for (int j = 0; j < POOL_SIZE_(1); j++)
         {
-            GridNodeMap_[i][j] = new GridNodePtr[POOL_SIZE_(2)];
+            GridNodeMap_[i][j] = new GridNodePtr_[POOL_SIZE_(2)];
             for (int k = 0; k < POOL_SIZE_(2); k++)
             {
-                GridNodeMap_[i][j][k] = new GridNode;
+                GridNodeMap_[i][j][k] = new GridNode_;
             }
         }
     }
@@ -33,7 +33,7 @@ void AStar::initGridMap(GridMap::Ptr occ_map, const Eigen::Vector3i pool_size)
     grid_map_ = occ_map;
 }
 
-double AStar::getDiagHeu(GridNodePtr node1, GridNodePtr node2)
+double AStar::getDiagHeu(GridNodePtr_ node1, GridNodePtr_ node2)
 {
     double dx = abs(node1->index(0) - node2->index(0));
     double dy = abs(node1->index(1) - node2->index(1));
@@ -60,7 +60,7 @@ double AStar::getDiagHeu(GridNodePtr node1, GridNodePtr node2)
     return h;
 }
 
-double AStar::getManhHeu(GridNodePtr node1, GridNodePtr node2)
+double AStar::getManhHeu(GridNodePtr_ node1, GridNodePtr_ node2)
 {
     double dx = abs(node1->index(0) - node2->index(0));
     double dy = abs(node1->index(1) - node2->index(1));
@@ -69,14 +69,14 @@ double AStar::getManhHeu(GridNodePtr node1, GridNodePtr node2)
     return dx + dy + dz;
 }
 
-double AStar::getEuclHeu(GridNodePtr node1, GridNodePtr node2)
+double AStar::getEuclHeu(GridNodePtr_ node1, GridNodePtr_ node2)
 {
     return (node2->index - node1->index).norm();
 }
 
-vector<GridNodePtr> AStar::retrievePath(GridNodePtr current)
+vector<GridNodePtr_> AStar::retrievePath(GridNodePtr_ current)
 {
-    vector<GridNodePtr> path;
+    vector<GridNodePtr_> path;
     path.push_back(current);
 
     while (current->cameFrom != NULL)
@@ -137,20 +137,20 @@ bool AStar::AstarSearch(const double step_size, Vector3d start_pt, Vector3d end_
     // if ( start_pt(0) > -1 && start_pt(0) < 0 )
     //     cout << "start_pt=" << start_pt.transpose() << " end_pt=" << end_pt.transpose() << endl;
 
-    GridNodePtr startPtr = GridNodeMap_[start_idx(0)][start_idx(1)][start_idx(2)];
-    GridNodePtr endPtr = GridNodeMap_[end_idx(0)][end_idx(1)][end_idx(2)];
+    GridNodePtr_ startPtr = GridNodeMap_[start_idx(0)][start_idx(1)][start_idx(2)];
+    GridNodePtr_ endPtr = GridNodeMap_[end_idx(0)][end_idx(1)][end_idx(2)];
 
-    std::priority_queue<GridNodePtr, std::vector<GridNodePtr>, NodeComparator> empty;
+    std::priority_queue<GridNodePtr_, std::vector<GridNodePtr_>, NodeComparator> empty;
     openSet_.swap(empty);
 
-    GridNodePtr neighborPtr = NULL;
-    GridNodePtr current = NULL;
+    GridNodePtr_ neighborPtr = NULL;
+    GridNodePtr_ current = NULL;
 
     startPtr->index = start_idx;
     startPtr->rounds = rounds_;
     startPtr->gScore = 0;
     startPtr->fScore = getHeu(startPtr, endPtr);
-    startPtr->state = GridNode::OPENSET; //put start node in open set
+    startPtr->state = GridNode_::OPENSET; //put start node in open set
     startPtr->cameFrom = NULL;
     openSet_.push(startPtr); //put start in open set
 
@@ -177,7 +177,7 @@ bool AStar::AstarSearch(const double step_size, Vector3d start_pt, Vector3d end_
             gridPath_ = retrievePath(current);
             return true;
         }
-        current->state = GridNode::CLOSEDSET; //move current node from open set to closed set.
+        current->state = GridNode_::CLOSEDSET; //move current node from open set to closed set.
 
         for (int dx = -1; dx <= 1; dx++)
             for (int dy = -1; dy <= 1; dy++)
@@ -201,7 +201,7 @@ bool AStar::AstarSearch(const double step_size, Vector3d start_pt, Vector3d end_
 
                     bool flag_explored = neighborPtr->rounds == rounds_;
 
-                    if (flag_explored && neighborPtr->state == GridNode::CLOSEDSET)
+                    if (flag_explored && neighborPtr->state == GridNode_::CLOSEDSET)
                     {
                         continue; //in closed set.
                     }
@@ -219,7 +219,7 @@ bool AStar::AstarSearch(const double step_size, Vector3d start_pt, Vector3d end_
                     if (!flag_explored)
                     {
                         //discover a new node
-                        neighborPtr->state = GridNode::OPENSET;
+                        neighborPtr->state = GridNode_::OPENSET;
                         neighborPtr->cameFrom = current;
                         neighborPtr->gScore = tentative_gScore;
                         neighborPtr->fScore = tentative_gScore + getHeu(neighborPtr, endPtr);
