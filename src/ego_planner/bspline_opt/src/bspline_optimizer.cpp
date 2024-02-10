@@ -1089,5 +1089,12 @@ namespace ego_planner
     Eigen::MatrixXd grad_3D = lambda1_ * g_smoothness + lambda4_ * g_fitness + lambda3_ * g_feasibility;
     memcpy(grad, grad_3D.data() + 3 * order_, n * sizeof(grad[0]));
   }
-
+  Eigen::MatrixXd BsplineOptimizer::getControlPoints()
+  {
+    return cps_.points;
+  }
+  double BsplineOptimizer::getTimeSpan()
+  {
+    return bspline_interval_;
+  }
 } // namespace ego_planner

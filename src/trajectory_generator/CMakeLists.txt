@@ -47,14 +47,14 @@ include_directories(
     ${PCL_INCLUDE_DIRS} 
 )
 
-add_executable(trajectory_generator
+add_executable(trajectory_generator_node
 	src/trajectory_generator_node.cpp
 	src/trajectory_generator_waypoint.cpp
   src/Astar_searcher.cpp
   src/uniform_bspline.cpp
 )
 
-target_link_libraries(trajectory_generator
+target_link_libraries(trajectory_generator_node
    ${catkin_LIBRARIES}
    ${PCL_LIBRARIES}
 )

@@ -31,6 +31,7 @@ using namespace Eigen;
 
 TrajectoryGeneratorWaypoint *_trajGene = new TrajectoryGeneratorWaypoint();
 AstarPathFinder *_astar_path_finder = new AstarPathFinder();
+ego_planner::EGOPlannerManager EGO_Planner;
 
 // Set the obstacle map
 double _resolution, _inv_resolution, _path_resolution;
@@ -45,7 +46,6 @@ double _Vel, _Acc;
 int _dev_order, _min_order;
 double hovering_speed, hovering_radius;
 int if_2d_search;
-int planning_alg;
 double h_reference;
 
 int num_cp;
@@ -85,6 +85,11 @@ enum STATE {
   EXEC_TRAJ,
   REPLAN_TRAJ
 } exec_state = STATE::INIT;
+enum PLANNING_ALG {
+  FTG = 0,
+  EGO = 1
+} planning_alg;
+int pl_alg;
 double no_replan_thresh, replan_thresh;
 ros::Timer _exec_timer;
 void execCallback(const ros::TimerEvent &e);
@@ -149,7 +154,7 @@ void execCallback(const ros::TimerEvent &e) {
   num++;
   if (num == 100) {
     printState();
-    if (!has_odom)
+    if (!has_odom && planning_alg == PLANNING_ALG::FTG)
       cout << "no odom." << endl;
     if (!has_target)
       cout << "wait for goal." << endl;
@@ -158,7 +163,7 @@ void execCallback(const ros::TimerEvent &e) {
 
   switch (exec_state) {
   case INIT: {
-    if (!has_odom)
+    if (!has_odom && planning_alg == PLANNING_ALG::FTG)
       return;
     if (!has_target)
       return;
@@ -204,7 +209,19 @@ void execCallback(const ros::TimerEvent &e) {
   }
 
   case GEN_NEW_TRAJ: {
-    bool success = trajGeneration();
+    bool success;
+    if (planning_alg == PLANNING_ALG::FTG)
+      success = trajGeneration();
+    else 
+    {
+      bool success = EGO_Planner.reboundReplan(start_pt, start_vel, start_acc, target_pt, target_vel, false, true);
+      Eigen::MatrixXd cps_ = EGO_Planner.getBsplineControlPoints();
+      double time_interval = EGO_Planner.getBsplineTimeSpan();
+      UniformBspline EGO_Out;
+      EGO_Out.setUniformBspline(cps_, 3, time_interval);
+      bspline_traj_pub(&EGO_Out);
+      visTrajectory(false, VIS_TRAJ);
+    }
     if (success)
       changeState(EXEC_TRAJ, "STATE");
     
@@ -270,6 +287,10 @@ void rcvWaypointsCallBack(const nav_msgs::Path &wp) {
   if (if_2d_search == 1) start_pt(2) = h_reference;
   start_vel = odom_vel;
   has_target = true;
+  if (planning_alg == PLANNING_ALG::EGO)
+  {
+    EGO_Planner.planGlobalTraj(start_pt, start_vel, start_acc, target_pt, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
+  }
 
   if (exec_state == WAIT_TARGET)
   {
@@ -727,7 +748,7 @@ int main(int argc, char **argv) {
   ros::NodeHandle nh("~");
   nh_ptr = &nh;
 
-  nh.param("planning/planning_alg", planning_alg, 1);
+  nh.param("planning/planning_alg", pl_alg, 0);
   nh.param("planning/vel", _Vel, 1.0);
   nh.param("planning/acc", _Acc, 1.0);
   nh.param("planning/dev_order", _dev_order, 3);
@@ -745,6 +766,13 @@ int main(int argc, char **argv) {
   nh.param("planning/if_2d_search", if_2d_search, 1);
   nh.param("planning/h_reference", h_reference, 15.0);
   num_cp = 40;
+  if (pl_alg == 0)
+  {
+    planning_alg = PLANNING_ALG::FTG;
+  } else if(pl_alg == 1)
+  {
+    planning_alg = PLANNING_ALG::EGO;
+  }
 
   _poly_num1D = 2 * _dev_order;
 
@@ -758,12 +786,13 @@ int main(int argc, char **argv) {
   _traj_vis_pub = nh.advertise<visualization_msgs::Marker>("vis_trajectory", 1);
   _path_vis_pub = nh.advertise<visualization_msgs::Marker>("vis_path", 1);
   bspline_pub = nh.advertise<quadrotor_msgs::Bspline>("bspline_trajectory", 10);
+  
+  _pts_sub = nh.subscribe("waypoints", 1, rcvWaypointsCallBack);
   // set the obstacle map
-  if (planning_alg == 1)
+  if (planning_alg == PLANNING_ALG::FTG)
   {
     _odom_sub = nh.subscribe("odom", 10, rcvOdomCallback);
     _map_sub = nh.subscribe("/pcl_render_node/local_pointcloud", 1, rcvPointCloudCallBack);
-    _pts_sub = nh.subscribe("waypoints", 1, rcvWaypointsCallBack);
 
     _map_lower << -_x_size / 2.0, -_y_size / 2.0, 0.0;
     _map_upper << +_x_size / 2.0, +_y_size / 2.0, _z_size;
@@ -779,7 +808,6 @@ int main(int argc, char **argv) {
   }
   else 
   {
-    ego_planner::EGOPlannerManager EGO_Planner;
     EGO_Planner.initPlanModules(nh);
   }
   ros::Rate rate(100);

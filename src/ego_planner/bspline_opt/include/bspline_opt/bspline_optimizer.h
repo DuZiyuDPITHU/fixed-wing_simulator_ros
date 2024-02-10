@@ -73,6 +73,7 @@ namespace ego_planner
     void optimize();
 
     Eigen::MatrixXd getControlPoints();
+    double getTimeSpan();
 
     AStar::Ptr a_star_;
     std::vector<Eigen::Vector3d> ref_pts_;

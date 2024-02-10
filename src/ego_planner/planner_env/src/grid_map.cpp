@@ -743,8 +743,6 @@ void GridMap::cloudCallback(const sensor_msgs::PointCloud2 &pointcloud_map)
   vector<Eigen::Vector3i> inf_pts(pow(2 * inf_step + 1, 3));
   Eigen::Vector3i inf_pt;
 
-
-  printf("receive point cloud %d\n", (int)cloud.points.size());
   for (int idx = 0; idx < (int)cloud.points.size(); idx++) {
     pt = cloud.points[idx];
     inflatePoint(Eigen::Vector3i(pt.x, pt.y, pt.z), inf_step, inf_pts);

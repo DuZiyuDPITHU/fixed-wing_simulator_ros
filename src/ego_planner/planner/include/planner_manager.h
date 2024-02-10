@@ -36,6 +36,8 @@ namespace ego_planner
                                  const std::vector<Eigen::Vector3d> &waypoints, const Eigen::Vector3d &end_vel, const Eigen::Vector3d &end_acc);
 
     void initPlanModules(ros::NodeHandle &nh);
+    Eigen::MatrixXd getBsplineControlPoints();
+    double getBsplineTimeSpan();
 
     PlanParameters pp_;
     LocalTrajData local_data_;

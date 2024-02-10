@@ -11,9 +11,19 @@ namespace ego_planner
 
   EGOPlannerManager::~EGOPlannerManager() { std::cout << "des manager" << std::endl; }
 
+  Eigen::MatrixXd EGOPlannerManager::getBsplineControlPoints()
+  {
+    return bspline_optimizer_rebound_->getControlPoints();
+  }
+  double EGOPlannerManager::getBsplineTimeSpan()
+  {
+    return bspline_optimizer_rebound_->getTimeSpan();
+  }
+
   void EGOPlannerManager::initPlanModules(ros::NodeHandle &nh)
   {
     /* read algorithm parameters */
+    printf("init ego planner\n");
 
     nh.param("ego_planner_manager/max_vel", pp_.max_vel_, -1.0);
     nh.param("ego_planner_manager/max_acc", pp_.max_acc_, -1.0);
