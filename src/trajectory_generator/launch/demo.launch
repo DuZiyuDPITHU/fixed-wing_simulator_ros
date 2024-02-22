@@ -20,6 +20,7 @@
       <remap from="~odom"             to="/visual_slam/odom"/>
       
       <param name="planning/planning_alg"       value="1"    />
+      <!-- 0 for fixed-wing trajectory generator, 1 for ego planner -->
       <param name="planning/if_2d_search"       value="1"    />
       <param name="planning/h_reference"        value="15.0" />
       <param name="planning/vel"                value="3.0"  />

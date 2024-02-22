@@ -25,6 +25,16 @@ cmake ..
 make
 sudo make install
 ```
+## 运行与参数
+```bash
+source devel/setup.bash
+roslaunch trajectory_generator demo.launch
+```
+demo.launch中有仿真环境和规划器的超参数：
+```
+name="planning/planning_alg"       value="0"
+<!-- 0 for fixed-wing trajectory generator, 1 for ego planner -->
+```
 ## 功能包介绍
 
 * random_complex：随机生成障碍物点云地图；
@@ -34,5 +44,6 @@ sudo make install
 * **trajectory_generator_node** ：规划一条可行的Bspline轨迹；
 * traj_server：将Bspline轨迹转换为控制指令；
 * so3_control：将控制指令转换为实际控制量；
-* quadrotor_simulator_so3：固定翼无人机仿真模型。
+* fixed-wing_dynamics_simulator：固定翼无人机仿真模型。
+* ego_planner: 采用EGO Planner作为规划器的对比实验
 
