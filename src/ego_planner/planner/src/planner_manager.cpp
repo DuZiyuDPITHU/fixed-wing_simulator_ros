@@ -1,6 +1,6 @@
 // #include <fstream>
 #include <planner_manager.h>
-#include <thread>
+//#include <thread>
 
 namespace ego_planner
 {
@@ -53,7 +53,7 @@ namespace ego_planner
                                         Eigen::Vector3d start_acc, Eigen::Vector3d local_target_pt,
                                         Eigen::Vector3d local_target_vel, bool flag_polyInit, bool flag_randomPolyTraj)
   {
-
+    grid_map_->updateOccupancyBufferInflate();
     static int count = 0;
     std::cout << endl
               << "[rebo replan]: -------------------------------------" << count++ << std::endl;
@@ -67,7 +67,6 @@ namespace ego_planner
       continous_failures_count_++;
       return false;
     }
-
     ros::Time t_start = ros::Time::now();
     ros::Duration t_init, t_opt, t_refine;
 
@@ -217,7 +216,7 @@ namespace ego_planner
         }
       }
     } while (flag_regenerate);
-
+    
     Eigen::MatrixXd ctrl_pts;
     UniformBspline::parameterizeToBspline(ts, point_set, start_end_derivatives, ctrl_pts);
 
@@ -247,6 +246,7 @@ namespace ego_planner
     t_start = ros::Time::now();
 
     /*** STEP 3: REFINE(RE-ALLOCATE TIME) IF NECESSARY ***/
+    printf("c/n");
     UniformBspline pos = UniformBspline(ctrl_pts, 3, ts);
     pos.setPhysicalLimits(pp_.max_vel_, pp_.max_acc_, pp_.feasibility_tolerance_);
 
@@ -379,7 +379,7 @@ namespace ego_planner
   {
 
     // generate global reference trajectory
-
+    printf("pg_a\n");
     vector<Eigen::Vector3d> points;
     points.push_back(start_pos);
     points.push_back(end_pos);
@@ -405,7 +405,7 @@ namespace ego_planner
         }
       }
     }
-
+    printf("pg_b/n");
     inter_points.push_back(points.back());
 
     // write position matrix
@@ -431,7 +431,7 @@ namespace ego_planner
       gl_traj = PolynomialTraj::one_segment_traj_gen(start_pos, start_vel, start_acc, end_pos, end_vel, end_acc, time(0));
     else
       return false;
-
+    printf("pg_c/n");
     auto time_now = ros::Time::now();
     global_data_.setGlobalTraj(gl_traj, time_now);
 

@@ -7,10 +7,10 @@ namespace ego_planner
 
   void BsplineOptimizer::setParam(ros::NodeHandle &nh)
   {
-    nh.param("optimization/lambda_smooth", lambda1_, -1.0);
-    nh.param("optimization/lambda_collision", lambda2_, -1.0);
-    nh.param("optimization/lambda_feasibility", lambda3_, -1.0);
-    nh.param("optimization/lambda_fitness", lambda4_, -1.0);
+    nh.param("ego_bspline_optimizer/lambda_smooth", lambda1_, -1.0);
+    nh.param("ego_bspline_optimizer/lambda_collision", lambda2_, -1.0);
+    nh.param("ego_bspline_optimizer/lambda_feasibility", lambda3_, -1.0);
+    nh.param("ego_bspline_optimizer/lambda_fitness", lambda4_, -1.0);
 
     nh.param("optimization/dist0", dist0_, -1.0);
     nh.param("optimization/max_vel", max_vel_, -1.0);
@@ -98,14 +98,14 @@ namespace ego_planner
         }
       }
     }
-
+    printf("segment size: %d\n", segment_ids.size());
     /*** a star search ***/
     vector<vector<Eigen::Vector3d>> a_star_pathes;
     for (size_t i = 0; i < segment_ids.size(); ++i)
     {
       //cout << "in=" << in.transpose() << " out=" << out.transpose() << endl;
       Eigen::Vector3d in(init_points.col(segment_ids[i].first)), out(init_points.col(segment_ids[i].second));
-      if (a_star_->AstarSearch(/*(in-out).norm()/10+0.05*/ 0.1, in, out))
+      if (a_star_->AstarSearch(/*(in-out).norm()/10+0.05*/ 1, in, out))
       {
         a_star_pathes.push_back(a_star_->getPath());
       }

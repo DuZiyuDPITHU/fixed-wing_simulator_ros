@@ -60,7 +60,7 @@ private:
 
 	//bool (*checkOccupancyPtr)( const Eigen::Vector3d &pos );
 
-	inline bool checkOccupancy(const Eigen::Vector3d &pos) { return (bool)grid_map_->getInflateOccupancy(pos); }
+	inline bool checkOccupancy(const Eigen::Vector3d &pos) {/*std::cout<<"check point "<<pos.transpose()<<" return " << grid_map_->getInflateOccupancy(pos) <<std::endl;*/ return (bool)grid_map_->getInflateOccupancy(pos); }
 
 	std::vector<GridNodePtr_> retrievePath(GridNodePtr_ current);
 
@@ -102,6 +102,7 @@ inline Eigen::Vector3d AStar::Index2Coord(const Eigen::Vector3i &index) const
 inline bool AStar::Coord2Index(const Eigen::Vector3d &pt, Eigen::Vector3i &idx) const
 {
 	idx = ((pt - center_) * inv_step_size_ + Eigen::Vector3d(0.5, 0.5, 0.5)).cast<int>() + CENTER_IDX_;
+	//std::cout << "check pt: " << pt.transpose() << " center_: " << center_ <<" inv_step_size_: "<< inv_step_size_ << " CENTER_IDX_: " << CENTER_IDX_.transpose() <<std::endl;
 
 	if (idx(0) < 0 || idx(0) >= POOL_SIZE_(0) || idx(1) < 0 || idx(1) >= POOL_SIZE_(1) || idx(2) < 0 || idx(2) >= POOL_SIZE_(2))
 	{

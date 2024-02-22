@@ -90,12 +90,13 @@ vector<GridNodePtr_> AStar::retrievePath(GridNodePtr_ current)
 
 bool AStar::ConvertToIndexAndAdjustStartEndPoints(Vector3d start_pt, Vector3d end_pt, Vector3i &start_idx, Vector3i &end_idx)
 {
+    //std::cout << "searching path from " << start_pt.transpose() << " to " << end_pt.transpose() <<std::endl;
     if (!Coord2Index(start_pt, start_idx) || !Coord2Index(end_pt, end_idx))
         return false;
 
     if (checkOccupancy(Index2Coord(start_idx)))
     {
-        //ROS_WARN("Start point is insdide an obstacle.");
+        ROS_WARN("Start point is inside an obstacle.");
         do
         {
             start_pt = (start_pt - end_pt).normalized() * step_size_ + start_pt;
@@ -106,7 +107,7 @@ bool AStar::ConvertToIndexAndAdjustStartEndPoints(Vector3d start_pt, Vector3d en
 
     if (checkOccupancy(Index2Coord(end_idx)))
     {
-        //ROS_WARN("End point is insdide an obstacle.");
+        ROS_WARN("End point is inside an obstacle.");
         do
         {
             end_pt = (end_pt - start_pt).normalized() * step_size_ + end_pt;

@@ -163,7 +163,7 @@ void execCallback(const ros::TimerEvent &e) {
 
   switch (exec_state) {
   case INIT: {
-    if (!has_odom && planning_alg == PLANNING_ALG::FTG)
+    if (!has_odom /*&& planning_alg == PLANNING_ALG::FTG*/)
       return;
     if (!has_target)
       return;
@@ -210,18 +210,8 @@ void execCallback(const ros::TimerEvent &e) {
 
   case GEN_NEW_TRAJ: {
     bool success;
-    if (planning_alg == PLANNING_ALG::FTG)
-      success = trajGeneration();
-    else 
-    {
-      bool success = EGO_Planner.reboundReplan(start_pt, start_vel, start_acc, target_pt, target_vel, false, true);
-      Eigen::MatrixXd cps_ = EGO_Planner.getBsplineControlPoints();
-      double time_interval = EGO_Planner.getBsplineTimeSpan();
-      UniformBspline EGO_Out;
-      EGO_Out.setUniformBspline(cps_, 3, time_interval);
-      bspline_traj_pub(&EGO_Out);
-      visTrajectory(false, VIS_TRAJ);
-    }
+    success = trajGeneration();
+    
     if (success)
       changeState(EXEC_TRAJ, "STATE");
     
@@ -289,7 +279,7 @@ void rcvWaypointsCallBack(const nav_msgs::Path &wp) {
   has_target = true;
   if (planning_alg == PLANNING_ALG::EGO)
   {
-    EGO_Planner.planGlobalTraj(start_pt, start_vel, start_acc, target_pt, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
+    //EGO_Planner.planGlobalTraj(start_pt, start_vel, start_acc, target_pt, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
   }
 
   if (exec_state == WAIT_TARGET)
@@ -317,9 +307,15 @@ void bspline_traj_pub(UniformBspline* uniform_bspline_ptr)
   bspline.start_time = ros::Time::now();
   bspline.traj_id = 1;
   Eigen::MatrixXd pos_pts = uniform_bspline_ptr->getControlPoint();
-  
+  /*
+  printf("pub cps\n");
+  for (int i=0;i<pos_pts.cols();i++)
+  {
+    std::cout<<pos_pts.col(i).transpose()<<std::endl;
+  }
+  */
   bspline.pos_pts.reserve(pos_pts.cols());
-  printf("Trajectory_generator: publishing bspline traj\n");
+  
   //std::cout << pos_pts << std::endl;
   for (int i = 0; i < pos_pts.cols(); ++i)
   {
@@ -330,6 +326,8 @@ void bspline_traj_pub(UniformBspline* uniform_bspline_ptr)
     bspline.pos_pts.push_back(pt);
   }
   Eigen::VectorXd knots = uniform_bspline_ptr->getKnot();
+  //printf("knots vector\n");
+  //std::cout << knots <<std::endl;
   if (knots.rows() <= 7)
     return;
   bspline.knots.reserve(knots.rows());
@@ -337,7 +335,7 @@ void bspline_traj_pub(UniformBspline* uniform_bspline_ptr)
   {
     bspline.knots.push_back(knots(i));
   }
-
+  printf("Trajectory_generator: publishing bspline traj\n");
   bspline_pub.publish(bspline);
 }
 
@@ -365,29 +363,17 @@ void rcvPointCloudCallBack(const sensor_msgs::PointCloud2 &pointcloud_map) {
 // front-end : A* search method
 // back-end  : Minimum snap trajectory generation
 bool trajGeneration() {
-  /**
-   *
-   * STEP 1:  search A* path and initialize bspline traj 
-   *
-   * **/
-  ros::Time t1, t2;
-  _astar_path_finder->resetUsedGrids();
-  t1 = ros::Time::now();
-  _astar_path_finder->AstarGraphSearch(start_pt, target_pt, if_2d_search);
-  auto grid_path = _astar_path_finder->getPath();
-  grid_path[0] = target_pt;
-  grid_path[grid_path.size()-1] = start_pt;
-  BsplineOpt bspline_opt;
-  bspline_opt.set_param(nh_ptr, _astar_path_finder);
-
   vector<Vector3d> start_target_derivative;
+  UniformBspline bspline;
   start_target_derivative.push_back(start_vel);
   if (has_default) start_target_derivative.push_back(target_vel);
   else 
   {
     Vector3d vel_direction(0, 0, 0);
-    vel_direction(0) = (grid_path[0]-grid_path[1])(0);
-    vel_direction(1) = (grid_path[0]-grid_path[1])(1);
+    //vel_direction(0) = (grid_path[0]-grid_path[1])(0);
+    //vel_direction(1) = (grid_path[0]-grid_path[1])(1);
+    vel_direction(0) = 1;
+    vel_direction(1) = 0;
     start_target_derivative.push_back(vel_direction.normalized()*hovering_speed);
     target_vel = start_target_derivative[1];
   }
@@ -399,37 +385,68 @@ bool trajGeneration() {
     target_acc = start_target_derivative[3];
   }
 
-  bool success_flag = bspline_opt.set_bspline(grid_path, start_target_derivative);
-  cur_bspline_traj = bspline_opt.get_bspline();
-  visTrajectory(false, VIS_INIT);
-  /**
-   *
-   * STEP 2:  optimize traj
-   *
-   * **/
-  t2 = ros::Time::now();
-
-  double init_time = (t2-t1).toSec();
-  t1 = t2;
-  if (!success_flag) return false;
-  bspline_opt.optStage();
-  t2 = ros::Time::now();
-  cur_bspline_traj = bspline_opt.get_bspline();
-  visTrajectory(false, VIS_OPT);
-  double opt_time = (t2-t1).toSec();
   
-  /**
-   *
-   * STEP 3:  Trajectory optimization
-   *
-   * **/
-  t1 = t2;
-  bspline_opt.adjStage();
-  t2 = ros::Time::now();
+  if (planning_alg == PLANNING_ALG::FTG)
+  {
+    /**
+     *
+     * STEP 1:  search A* path and initialize bspline traj 
+     *
+     * **/
+    ros::Time t1, t2;
+    _astar_path_finder->resetUsedGrids();
+    t1 = ros::Time::now();
+    _astar_path_finder->AstarGraphSearch(start_pt, target_pt, if_2d_search);
+    auto grid_path = _astar_path_finder->getPath();
+    grid_path[0] = target_pt;
+    grid_path[grid_path.size()-1] = start_pt;
+    BsplineOpt bspline_opt;
+    bspline_opt.set_param(nh_ptr, _astar_path_finder);
 
-  double adj_time = (t2-t1).toSec();
-  printf("Init Opt Adj Time: %f, %f, %f\n", init_time, opt_time, adj_time);
-  UniformBspline bspline(bspline_opt.get_bspline());
+    
+    bool success_flag = bspline_opt.set_bspline(grid_path, start_target_derivative);
+    cur_bspline_traj = bspline_opt.get_bspline();
+    visTrajectory(false, VIS_INIT);
+    /**
+     *
+     * STEP 2:  optimize traj
+     *
+     * **/
+    t2 = ros::Time::now();
+
+    double init_time = (t2-t1).toSec();
+    t1 = t2;
+    if (!success_flag) return false;
+    bspline_opt.optStage();
+    t2 = ros::Time::now();
+    cur_bspline_traj = bspline_opt.get_bspline();
+    visTrajectory(false, VIS_OPT);
+    double opt_time = (t2-t1).toSec();
+    
+    /**
+     *
+     * STEP 3:  Trajectory optimization
+     *
+     * **/
+    t1 = t2;
+    bspline_opt.adjStage();
+    t2 = ros::Time::now();
+
+    double adj_time = (t2-t1).toSec();
+    printf("Init Opt Adj Time: %f, %f, %f\n", init_time, opt_time, adj_time);
+    bspline = bspline_opt.get_bspline();
+  }
+  else 
+  {
+    //std::cout<<"start vel: "<<start_vel<<endl;
+    bool success = EGO_Planner.reboundReplan(start_pt, start_vel, start_acc, target_pt, target_vel, false, true);
+    Eigen::MatrixXd cps_ = EGO_Planner.getBsplineControlPoints();
+    double time_interval = EGO_Planner.getBsplineTimeSpan();
+    UniformBspline EGO_Out;
+    EGO_Out.setUniformBspline(cps_, 3, time_interval);
+    bspline = EGO_Out;
+  }
+  
   //std::cout<<bspline.get_control_points()<<std::endl;
   time_traj_start = ros::Time::now();
   time_duration = bspline.getTimeSum();
@@ -769,9 +786,11 @@ int main(int argc, char **argv) {
   if (pl_alg == 0)
   {
     planning_alg = PLANNING_ALG::FTG;
+    ROS_WARN("Select fixed-wing trajectory generator as planning algorithm\n");
   } else if(pl_alg == 1)
   {
     planning_alg = PLANNING_ALG::EGO;
+    ROS_WARN("Select EGO planner as planning algorithm\n");
   }
 
   _poly_num1D = 2 * _dev_order;
@@ -808,6 +827,7 @@ int main(int argc, char **argv) {
   }
   else 
   {
+    _odom_sub = nh.subscribe("odom", 10, rcvOdomCallback);
     EGO_Planner.initPlanModules(nh);
   }
   ros::Rate rate(100);

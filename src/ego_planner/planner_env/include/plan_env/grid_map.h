@@ -89,6 +89,7 @@ struct MappingData {
 
   std::vector<double> occupancy_buffer_;
   std::vector<char> occupancy_buffer_inflate_;
+  std::vector<char> cloud_buffer_;
 
   // camera position and pose data
 
@@ -161,6 +162,10 @@ public:
   inline bool isUnknown(const Eigen::Vector3d& pos);
   inline bool isKnownFree(const Eigen::Vector3i& id);
   inline bool isKnownOccupied(const Eigen::Vector3i& id);
+  inline void updateOccupancyBufferInflate(){
+    std::memcpy(md_.occupancy_buffer_inflate_.data(), md_.cloud_buffer_.data(), mp_.map_voxel_num_(0) * mp_.map_voxel_num_(1) * mp_.map_voxel_num_(2));
+    //std::cout << "cpy complete" << std::endl;
+    }
 
   void initMap(ros::NodeHandle& nh);
 

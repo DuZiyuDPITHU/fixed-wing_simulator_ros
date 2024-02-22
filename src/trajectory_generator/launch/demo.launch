@@ -53,17 +53,20 @@
       <param name="hovering_speed" value="6.0" type="double"/>
       <param name="hovering_radius" value="20.0" type="double"/>
 
-      <param name="ego_planner_manager/max_vel"                 value="3.0"   type="double"/>
-      <param name="ego_planner_manager/max_acc"                 value="2.0"   type="double"/>
-      <param name="ego_planner_manager/max_jerk"                value="4.0"   type="double"/>
-      <param name="ego_planner_manager/control_points_distance" value="4.0"   type="double"/>
+      <param name="ego_planner_manager/max_vel"                 value="20.0"   type="double"/>
+      <param name="ego_planner_manager/max_acc"                 value="12.0"   type="double"/>
+      <param name="ego_planner_manager/max_jerk"                value="12.0"   type="double"/>
+      <param name="ego_planner_manager/control_points_distance" value="8.0"   type="double"/>
       <param name="ego_planner_manager/feasibility_tolerance"   value="0.05"  type="double"/>
       <param name="ego_planner_manager/planning_horizon"        value="$(arg sensing_horizon)" type="double"/>
-      <param name="ego_planner_grid_map/local_update_range_x"   value="25" /> 
-      <param name="ego_planner_grid_map/local_update_range_y"   value="25" /> 
+      <param name="ego_planner_grid_map/local_update_range_x"   value="200" /> 
+      <param name="ego_planner_grid_map/local_update_range_y"   value="200" /> 
       <param name="ego_planner_grid_map/local_update_range_z"   value="25" /> 
-      <param name="ego_planner_grid_map/obstacles_inflation"    value="1.0"/>
-      <param name="ego_planner_grid_map/obstacles_inflation"    value="1.0"/> 
+      <param name="ego_planner_grid_map/obstacles_inflation"    value="0.0"/> 
+      <param name="ego_bspline_optimizer/lambda_smooth" value="1.0" type="double"/>
+      <param name="ego_bspline_optimizer/lambda_collision" value="0.5" type="double"/>
+      <param name="ego_bspline_optimizer/lambda_feasibility" value="0.1" type="double"/>
+      <param name="ego_bspline_optimizer/lambda_fitness" value="1.0" type="double"/>
 
 
   </node>

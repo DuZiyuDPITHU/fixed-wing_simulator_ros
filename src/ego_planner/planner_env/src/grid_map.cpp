@@ -78,6 +78,7 @@ void GridMap::initMap(ros::NodeHandle &nh)
 
   md_.occupancy_buffer_ = vector<double>(buffer_size, mp_.clamp_min_log_ - mp_.unknown_flag_);
   md_.occupancy_buffer_inflate_ = vector<char>(buffer_size, 0);
+  md_.cloud_buffer_ = vector<char>(buffer_size, 0);
 
   md_.count_hit_and_miss_ = vector<short>(buffer_size, 0);
   md_.count_hit_ = vector<short>(buffer_size, 0);
@@ -95,7 +96,7 @@ void GridMap::initMap(ros::NodeHandle &nh)
 
   /* init callback */
 
-  depth_sub_.reset(new message_filters::Subscriber<sensor_msgs::Image>(node_, "/grid_map/depth", 50));
+  //depth_sub_.reset(new message_filters::Subscriber<sensor_msgs::Image>(node_, "/grid_map/depth", 50));
   /*
   if (mp_.pose_type_ == POSE_STAMPED)
   {
@@ -123,8 +124,8 @@ void GridMap::initMap(ros::NodeHandle &nh)
   indep_odom_sub_ =
       node_.subscribe<nav_msgs::Odometry>("odom", 10, &GridMap::odomCallback, this);
 
-  occ_timer_ = node_.createTimer(ros::Duration(0.05), &GridMap::updateOccupancyCallback, this);
-  vis_timer_ = node_.createTimer(ros::Duration(0.05), &GridMap::visCallback, this);
+  //occ_timer_ = node_.createTimer(ros::Duration(0.05), &GridMap::updateOccupancyCallback, this);
+  //vis_timer_ = node_.createTimer(ros::Duration(0.05), &GridMap::visCallback, this);
 
   map_pub_ = node_.advertise<sensor_msgs::PointCloud2>("/grid_map/occupancy", 10);
   map_inf_pub_ = node_.advertise<sensor_msgs::PointCloud2>("/grid_map/occupancy_inflate", 10);
@@ -745,7 +746,11 @@ void GridMap::cloudCallback(const sensor_msgs::PointCloud2 &pointcloud_map)
 
   for (int idx = 0; idx < (int)cloud.points.size(); idx++) {
     pt = cloud.points[idx];
-    inflatePoint(Eigen::Vector3i(pt.x, pt.y, pt.z), inf_step, inf_pts);
+    Eigen::Vector3d pt_pos(pt.x, pt.y, pt.z);
+    Eigen::Vector3i pt_idx;
+    posToIndex(pt_pos, pt_idx);
+    inflatePoint(pt_idx, inf_step, inf_pts);
+    //printf("add obs: %f, %f, %f\n", pt.x, pt.y, pt.z);
     // set obstalces into grid map for path planning
     for (int k = 0; k < (int)inf_pts.size(); ++k)
     {
@@ -756,7 +761,7 @@ void GridMap::cloudCallback(const sensor_msgs::PointCloud2 &pointcloud_map)
       {
         continue;
       }
-      md_.occupancy_buffer_inflate_[idx_inf] = 1;
+      md_.cloud_buffer_[idx_inf] = 1;
     }
   }
 }
