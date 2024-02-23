@@ -795,7 +795,7 @@ int main(int argc, char **argv) {
 
   _poly_num1D = 2 * _dev_order;
 
-  _exec_timer = nh.createTimer(ros::Duration(0.01), execCallback);
+  _exec_timer = nh.createTimer(ros::Duration(0.02), execCallback);
 
   _traj_pub =
       nh.advertise<quadrotor_msgs::PolynomialTrajectory>("trajectory", 50);

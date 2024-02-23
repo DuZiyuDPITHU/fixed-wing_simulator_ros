@@ -1,0 +1,35 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/duziyu/fixed-wing_trajecotry_generator/devel/include/**",
+        "/opt/ros/noetic/include/**",
+        "/home/duziyu/fixed-wing_trajecotry_generator/src/fixed-wing_simulator_ros/src/read_only/fixed-wing_dynamics_simulator/autopilot/include/**",
+        "/home/duziyu/fixed-wing_trajecotry_generator/src/fixed-wing_simulator_ros/src/ego_planner/bspline_opt/include/**",
+        "/home/duziyu/fixed-wing_trajecotry_generator/src/fixed-wing_simulator_ros/src/read_only/fixed-wing_dynamics_simulator/dynamics/include/**",
+        "/home/duziyu/fixed-wing_trajecotry_generator/src/fixed-wing_simulator_ros/src/ego_planner/planner/include/**",
+        "/home/duziyu/fixed-wing_trajecotry_generator/src/fixed-wing_simulator_ros/src/read_only/fixed-wing_dynamics_simulator/estimator/include/**",
+        "/home/duziyu/fixed-wing_trajecotry_generator/src/fixed-wing_simulator_ros/src/ego_planner/path_searching/include/**",
+        "/home/duziyu/fixed-wing_trajecotry_generator/src/fixed-wing_simulator_ros/src/ego_planner/planner_env/include/**",
+        "/home/duziyu/fixed-wing_trajecotry_generator/src/fixed-wing_simulator_ros/src/read_only/Utils/pose_utils/include/**",
+        "/home/duziyu/fixed-wing_trajecotry_generator/src/fixed-wing_simulator_ros/src/read_only/Utils/quadrotor_msgs/include/**",
+        "/home/duziyu/fixed-wing_trajecotry_generator/src/fixed-wing_simulator_ros/src/read_only/fixed-wing_dynamics_simulator/so3_control/include/**",
+        "/home/duziyu/fixed-wing_trajecotry_generator/src/fixed-wing_simulator_ros/src/read_only/fixed-wing_dynamics_simulator/so3_quadrotor_simulator/include/**",
+        "/home/duziyu/fixed-wing_trajecotry_generator/src/fixed-wing_simulator_ros/src/read_only/Utils/tools/include/**",
+        "/home/duziyu/fixed-wing_trajecotry_generator/src/fixed-wing_simulator_ros/src/ego_planner/traj_utils/include/**",
+        "/home/duziyu/fixed-wing_trajecotry_generator/src/fixed-wing_simulator_ros/src/trajectory_generator/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}

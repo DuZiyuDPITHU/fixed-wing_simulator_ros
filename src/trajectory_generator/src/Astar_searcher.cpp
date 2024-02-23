@@ -355,6 +355,12 @@ inline void AstarPathFinder::AstarGetSucc(GridNodePtr currentPtr, int if_2d_sear
               neighborIdx(2) < 0 || neighborIdx(2) >= GLZ_SIZE) {
             continue;
           }
+          if (currentPtr->cameFrom != NULL)
+          {
+            Vector3i currentDir = neighborIdx - currentPtr->index;
+            Vector3i lastDir = currentPtr->index - currentPtr->cameFrom->index;
+            if ((currentDir(0)*lastDir(0)+currentDir(1)*lastDir(1)+currentDir(2)*lastDir(2))<=0) {continue;}
+          }
 
           neighborPtrSets.push_back(
               GridNodeMap[neighborIdx(0)][neighborIdx(1)][neighborIdx(2)]);
@@ -365,8 +371,8 @@ inline void AstarPathFinder::AstarGetSucc(GridNodePtr currentPtr, int if_2d_sear
   }
   else if (if_2d_search == 1)
   {
-    for (int dy = 1; dy > -2; dy--) {
-      for (int dx = 1; dx > -2; dx--) {
+    for (int dy = 2; dy > -3; dy--) {
+      for (int dx = 2; dx > -3; dx--) {
         if (dx == 0 && dy == 0)
           continue;
 
@@ -378,6 +384,12 @@ inline void AstarPathFinder::AstarGetSucc(GridNodePtr currentPtr, int if_2d_sear
             neighborIdx(1) < 0 || neighborIdx(1) >= GLY_SIZE ||
             neighborIdx(2) < 0 || neighborIdx(2) >= GLZ_SIZE) {
           continue;
+        }
+        if (currentPtr->cameFrom != NULL && currentPtr->cameFrom->cameFrom != NULL)
+        {
+          Vector3d currentDir = (gridIndex2coord(neighborIdx) - currentPtr->coord).normalized();
+          Vector3d lastDir = (currentPtr->coord - currentPtr->cameFrom->cameFrom->coord).normalized();
+          if (currentDir.dot(lastDir)<0.71) {continue;}
         }
 
         neighborPtrSets.push_back(
