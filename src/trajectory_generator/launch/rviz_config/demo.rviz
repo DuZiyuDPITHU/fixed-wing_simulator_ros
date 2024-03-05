@@ -6,7 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
       Splitter Ratio: 0.6090225577354431
-    Tree Height: 797
+    Tree Height: 441
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -98,7 +98,7 @@ Visualization Manager:
           Marker Topic: /trajectory_generator_node/vis_trajectory
           Name: Trajectory
           Namespaces:
-            traj_node/trajectory: true
+            {}
           Queue Size: 100
           Value: true
         - Class: rviz/Marker
@@ -106,7 +106,7 @@ Visualization Manager:
           Marker Topic: /trajectory_generator_node/vis_opt_trajectory
           Name: Trajectory
           Namespaces:
-            traj_node/trajectory: true
+            {}
           Queue Size: 100
           Value: true
         - Class: rviz/Marker
@@ -114,7 +114,7 @@ Visualization Manager:
           Marker Topic: /trajectory_generator_node/vis_init_trajectory
           Name: Trajectory
           Namespaces:
-            traj_node/trajectory: true
+            {}
           Queue Size: 100
           Value: true
         - Class: rviz/Marker
@@ -129,11 +129,11 @@ Visualization Manager:
       Name: Trajectory
     - Class: rviz/Group
       Displays:
-        - Alpha: 1.0000000149011612
+        - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 20
-            Min Value: 15
+            Max Value: 45.000999450683594
+            Min Value: 0.0010000000474974513
             Value: true
           Axis: Z
           Channel Name: intensity
@@ -160,8 +160,8 @@ Visualization Manager:
         - Alpha: 1
           Autocompute Intensity Bounds: true
           Autocompute Value Bounds:
-            Max Value: 28.000999450683594
-            Min Value: 1.5010000467300415
+            Max Value: 30.60099983215332
+            Min Value: 1.8009999990463257
             Value: true
           Axis: Z
           Channel Name: intensity
@@ -178,7 +178,7 @@ Visualization Manager:
           Queue Size: 10
           Selectable: true
           Size (Pixels): 3
-          Size (m): 0.50000000298023224
+          Size (m): 0.5
           Style: Flat Squares
           Topic: /pcl_render_node/local_pointcloud
           Unreliable: false
@@ -213,7 +213,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 580.7642822265625
+      Distance: 123.450439453125
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -230,7 +230,7 @@ Visualization Manager:
       Name: Current View
       Near Clip Distance: 0.009999999776482582
       Pitch: 1.5697963237762451
-      Target Frame: /base
+      Target Frame: base
       Yaw: 4.712987899780273
     Saved:
       - Class: rviz/Orbit

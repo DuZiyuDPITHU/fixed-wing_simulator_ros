@@ -658,7 +658,7 @@ void BsplineOpt::calcCurvatureCost(const Eigen::MatrixXd &q, double &cost, Eigen
     }
     else if (K0<0 && -K0>max_K_)
     {
-      cost += -K0 - max_K_;
+      cost += (-K0 - max_K_)*(-K0 - max_K_);
       termx1 = (ddcy_t0*pow(squa_norm0, 1.5)-3*(dcx_t0*ddcy_t0-ddcx_t0*dcy_t0)*squa_norm0*dcx_t0)/pow(squa_norm0, 3);
       termx2 = -dcy_t0/pow(squa_norm0, 1.5);
       termy1 = (-ddcx_t0*pow(squa_norm0, 1.5)-3*(dcx_t0*ddcy_t0-ddcx_t0*dcy_t0)*squa_norm0*dcy_t0)/pow(squa_norm0, 3);
@@ -674,7 +674,7 @@ void BsplineOpt::calcCurvatureCost(const Eigen::MatrixXd &q, double &cost, Eigen
     }
     if (Kh>0 && Kh>max_K_)
     {
-      cost += Kh - max_K_;
+      cost += (Kh - max_K_)*(Kh - max_K_);
       termx1 = (ddcy_th*pow(squa_normh, 1.5)-3*(dcx_th*ddcy_th-ddcx_th*dcy_th)*squa_normh*dcx_th)/pow(squa_normh, 3);
       termx2 = -dcy_th/pow(squa_normh, 1.5);
       termy1 = (-ddcx_th*pow(squa_normh, 1.5)-3*(dcx_th*ddcy_th-ddcx_th*dcy_th)*squa_normh*dcy_th)/pow(squa_normh, 3);
@@ -690,7 +690,7 @@ void BsplineOpt::calcCurvatureCost(const Eigen::MatrixXd &q, double &cost, Eigen
     }
     else if (Kh<0 && -Kh>max_K_)
     {
-      cost += -Kh - max_K_;
+      cost += (-Kh - max_K_)*(-Kh - max_K_);
       termx1 = (ddcy_th*pow(squa_normh, 1.5)-3*(dcx_th*ddcy_th-ddcx_th*dcy_th)*squa_normh*dcx_th)/pow(squa_normh, 3);
       termx2 = -dcy_th/pow(squa_normh, 1.5);
       termy1 = (-ddcx_th*pow(squa_normh, 1.5)-3*(dcx_th*ddcy_th-ddcx_th*dcy_th)*squa_normh*dcy_th)/pow(squa_normh, 3);

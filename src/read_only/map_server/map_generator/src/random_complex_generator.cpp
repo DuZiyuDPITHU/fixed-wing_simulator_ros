@@ -141,10 +141,30 @@ void RandomMapGenerate(bool ground_map_swt)
       for (int i = 0; i < _obs_num + 1; i++)
       {
          double x, y, w, h;
+         
          x = rand_x(eng);
          y = rand_y(eng);
          w = rand_w(eng);
-
+/*
+         if (i == 0)
+         {
+            x = -40;
+            y = 0;
+            w = 12;
+         }
+         else if (i == 1)
+         {
+            x = -100;
+            y = 0;
+            w = 6;
+         }
+         else if (i == 2)
+         {
+            x = 130;
+            y = 0;
+            w = 6;
+         }
+*/
          if (sqrt(pow(x - _init_x, 2) + pow(y - _init_y, 2)) < 20.0)
             continue;
 

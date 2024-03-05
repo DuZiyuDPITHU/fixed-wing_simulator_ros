@@ -624,9 +624,7 @@ void visTrajectory(bool if_default, VIS_TYPE vis_type) {
   _traj_vis.header.frame_id = "world";
 
   _traj_vis.ns = "traj_node/trajectory";
-  //_traj_vis.id = vis_traj_id;
   _traj_vis.id = 0;
-  vis_traj_id++;
   _traj_vis.type = visualization_msgs::Marker::LINE_STRIP;
   _traj_vis.action = visualization_msgs::Marker::ADD;
   
@@ -637,11 +635,14 @@ void visTrajectory(bool if_default, VIS_TYPE vis_type) {
 
   if (vis_type == VIS_TRAJ)
   {
+    _traj_vis.id = vis_traj_id;
+    vis_traj_id++;
+    _traj_vis.lifetime = ros::Duration(0.0);
     _traj_vis.scale.x = _vis_traj_width;
     _traj_vis.scale.y = _vis_traj_width;
     _traj_vis.scale.z = _vis_traj_width;
     
-    _traj_vis.color.a = 0.9;
+    _traj_vis.color.a = 0.6;
     _traj_vis.color.r = 0.5373;
     _traj_vis.color.g = 0.5137;
     _traj_vis.color.b = 0.7490;
@@ -665,8 +666,6 @@ void visTrajectory(bool if_default, VIS_TYPE vis_type) {
     _traj_vis.color.g = 0.7020;
     _traj_vis.color.b = 0.2706;
   }
-
-  //_traj_vis.lifetime = ros::Duration(0.0);
 
   _traj_vis.points.clear();
   Vector3d pos;
@@ -795,7 +794,7 @@ int main(int argc, char **argv) {
 
   _poly_num1D = 2 * _dev_order;
 
-  _exec_timer = nh.createTimer(ros::Duration(0.02), execCallback);
+  _exec_timer = nh.createTimer(ros::Duration(0.2), execCallback);
 
   _traj_pub =
       nh.advertise<quadrotor_msgs::PolynomialTrajectory>("trajectory", 50);
